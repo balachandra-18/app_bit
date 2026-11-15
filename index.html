@@ -333,7 +333,7 @@ function template(d){
   var cDone=state.cMin>=CTOT, left=Math.max(0,CTOT-state.cMin);
   var cT=cDone?'C mastery practice':'C programming · Code with Harry';
   var cS=cDone?'Do the next open item in the C roadmap below':'Keep going: '+dur(left)+' of the 11 h video left';
-  var studyT='Study: '+subj, studyS=f.name+' prep · '+f.mods+'. Find the lecture on YouTube and match it to the syllabus.';
+  var studyT='Study: '+subj, studyS=f.name+' prep. Watch the YouTube tutorial for the target topics and write short notes.';
   var stopT='Plan tomorrow · pack bag · hard stop';
   if(type==='test'){
     var tk=dk(d),ex=examsOn(tk),nx=nextExam(tk,true),tsub=nx?nx.subj:subj;
@@ -348,7 +348,7 @@ function template(d){
   if(type==='college'){
     var subs=classSubjects(d);
     return {label:'College day · evening block 6 PM to 10 PM',
-      blocks:[B('18:00','19:00','topics',"Today's class topics",subs.length?'Revise '+subs.join(' · ')+'. Find each topic on YouTube and match it to the syllabus.':'Find what was taught today on YouTube and match it to the syllabus.','study'),
+      blocks:[B('18:00','19:00','study','Study: '+subj,studyS,'study'),
         B('19:00','19:15','b1','Break','','break'),
         B('20:30','21:00','dinner','Dinner','','meal'),
         B('21:00','21:45','c',cT,cS,'code'),
@@ -619,9 +619,6 @@ function renderDay(){
   h+='<div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="'+total+'" aria-valuenow="'+done+'"><i style="width:'+(total?Math.round(done/total*100):0)+'%"></i></div>';
   var tn=testOn(sel);
   if(tn){var exd=examsOn(sel);h+='<div class="banner">'+tn+' day. '+(exd.length?'Exam today: '+exd.map(function(x){return esc(x.subj)+(x.time?' at '+esc(x.time):'')}).join(', ')+'.':'No exam added for today. Add your exam dates under Exams.')+'</div>'}
-  if(type==='college'){
-    h+='<label class="f" style="margin-top:14px">What was taught today (type it, this is your revision list)<textarea id="topics" placeholder="e.g. Maths: partial differentiation · Physics: de Broglie waves">'+esc(state.topics[sel]||'')+'</textarea></label>';
-  }
   h+='<ul class="sched">'+rows.map(function(r){return rowHtml(r,isT,nm)}).join('')+'</ul>';
   var cls=ttNow()[d.getDay()]||[];
   if(cls.length){
@@ -926,8 +923,10 @@ var undoSnap=null;
 function geminiJSON(p){
   var key='';try{key=localStorage.getItem('bit-gemini-key')||''}catch(e){}
   if(!key)return Promise.reject(new Error('Add your Gemini key under Settings and backup first.'));
-  return fetch('https://generativelanguage.googleapis.com/v1beta/models/'+gModel()+':generateContent?key='+encodeURIComponent(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:p}]}],generationConfig:{responseMimeType:'application/json'}})})
-   .then(function(r){return r.json()}).then(function(j){if(j.error)throw new Error(j.error.message||'AI request failed.');return JSON.parse(j.candidates[0].content.parts[0].text)})}
+  function call(cfg){return fetch('https://generativelanguage.googleapis.com/v1beta/models/'+gModel()+':generateContent?key='+encodeURIComponent(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:p}]}],generationConfig:cfg})}).then(function(r){return r.json()})}
+  return call({responseMimeType:'application/json',thinkingConfig:{thinkingLevel:'minimal'}}).then(function(j){
+    if(j.error&&/think/i.test(j.error.message||''))return call({responseMimeType:'application/json'});return j
+  }).then(function(j){if(j.error)throw new Error(j.error.message||'AI request failed.');return JSON.parse(j.candidates[0].content.parts[0].text)})}
 function aMsg(t,bad,undo){var m=$('#a-msg');m.className='msg'+(bad?' bad':'');m.textContent=t;
   if(undo){var b=document.createElement('button');b.type='button';b.className='ghost sm';b.style.marginLeft='10px';b.setAttribute('data-act','undo');b.textContent='Undo';m.appendChild(b)}}
 function runAssistant(q0){
@@ -935,8 +934,8 @@ function runAssistant(q0){
   aMsg('Thinking...',false);
   var tasks=state.tasks.filter(function(t){return !isDone(t)}).slice(0,60).map(function(t){return {id:t.id,title:t.title,kind:t.kind,mins:t.mins,due:t.due}});
   var syl=state.syl.slice(0,150).map(function(x){return {id:x.id,subject:x.subj,module:x.mod,title:x.title,done:!!x.done}});
-  var p='You edit a student study planner. Today is '+today()+' ('+DOW[new Date().getDay()]+'). Subjects: '+SUBJ.join(', ')+'.\nOpen tasks: '+JSON.stringify(tasks)+'\nSyllabus topics: '+JSON.stringify(syl)+
-   '\nReply with JSON only: {"reply":"one or two short sentences","actions":[...]}. Allowed actions:\n{"do":"addTask","title":"","kind":"assign|lab|tut|prep|code|other","date":"YYYY-MM-DD","time":"HH:MM","mins":60}\n{"do":"editTask","id":"","title":"","date":"","time":"","mins":0} (include only fields to change)\n{"do":"deleteTask","id":""}\n{"do":"doneTask","id":"","done":true}\n{"do":"addTopics","subject":"","module":"","topics":[""]}\n{"do":"removeTopic","id":""}\n{"do":"doneTopic","id":"","done":true}\n{"do":"holiday","date":"YYYY-MM-DD","on":true}\n{"do":"out","date":"YYYY-MM-DD","on":true}\n{"do":"busy","dates":["YYYY-MM-DD"],"from":"13:00","to":"16:00","on":true} (not free during those hours on those dates; on:false clears busy hours for those dates)\nUse only ids listed above. If the request needs something not allowed, return no actions and say so in reply.\n\nRequest: '+q;
+  var p='You edit a student study planner. Today is '+today()+' ('+DOW[new Date().getDay()]+'). Subjects: '+SUBJ.join(', ')+'.\nOpen tasks: '+JSON.stringify(tasks)+'\nExams: '+JSON.stringify(exams().map(function(x){return {date:x.d,subject:x.subj,time:x.time}}))+'\nSyllabus topics: '+JSON.stringify(syl)+
+   '\nReply with JSON only: {"reply":"one or two short sentences","actions":[...]}. Allowed actions:\n{"do":"addTask","title":"","kind":"assign|lab|tut|prep|code|other","date":"YYYY-MM-DD","time":"HH:MM","mins":60}\n{"do":"editTask","id":"","title":"","date":"","time":"","mins":0} (include only fields to change)\n{"do":"deleteTask","id":""}\n{"do":"doneTask","id":"","done":true}\n{"do":"addTopics","subject":"","module":"","topics":[""]}\n{"do":"removeTopic","id":""}\n{"do":"doneTopic","id":"","done":true}\n{"do":"holiday","date":"YYYY-MM-DD","on":true}\n{"do":"out","date":"YYYY-MM-DD","on":true}\n{"do":"busy","dates":["YYYY-MM-DD"],"from":"13:00","to":"16:00","on":true} (not free during those hours on those dates; on:false clears busy hours for those dates)\n{"do":"addExam","date":"YYYY-MM-DD","subject":"","time":"10:00 AM"}\n{"do":"removeExam","date":"YYYY-MM-DD","subject":""}\n{"do":"setClasses","weekday":1,"lines":["8:00 AM | Physics"]} (weekday 1=Mon to 6=Sat, replaces that day\'s classes)\nUse only ids listed above. If the request needs something not allowed, return no actions and say so in reply.\n\nRequest: '+q;
   geminiJSON(p).then(applyActions).catch(function(err){aMsg(String(err.message||err),true)})}
 function applyActions(o){
   var acts=(o&&o.actions)||[],n=0,dre=/^\d{4}-\d{2}-\d{2}$/,tre=/^\d{2}:\d{2}$/;
@@ -951,6 +950,9 @@ function applyActions(o){
     else if(a.do==='doneTopic'){var tp=state.syl.filter(function(x){return x.id===a.id})[0];if(tp){tp.done=!!a.done;if(!a.done)delete tp.doneOn;n++}}
     else if(a.do==='holiday'&&dre.test(a.date||'')){if(a.on)state.holidays[a.date]=1;else delete state.holidays[a.date];n++}
     else if(a.do==='busy'&&a.dates&&(a.on===false||(tre.test(a.from||'')&&tre.test(a.to||'')))){state.busy=state.busy||{};a.dates.forEach(function(dt){if(!dre.test(dt))return;if(a.on===false)delete state.busy[dt];else(state.busy[dt]=state.busy[dt]||[]).push({s:tm(a.from),e:tm(a.to)});n++})}
+    else if(a.do==='addExam'&&a.subject&&dre.test(a.date||'')){state.exams=state.exams||[];state.exams.push({id:'e'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),d:a.date,subj:String(a.subject).slice(0,40),time:String(a.time||'').slice(0,12)});n++}
+    else if(a.do==='removeExam'&&dre.test(a.date||'')){var e0=(state.exams||[]).length;state.exams=(state.exams||[]).filter(function(x){return !(x.d===a.date&&(!a.subject||x.subj===a.subject))});if(state.exams.length<e0)n++}
+    else if(a.do==='setClasses'&&a.weekday>=1&&a.weekday<=6&&a.lines){var ntt={};[1,2,3,4,5,6].forEach(function(w){ntt[w]=ttNow()[w]||[]});ntt[a.weekday]=a.lines.map(function(l){var ps=String(l).split('|'),t0=ps.shift().trim(),n0=ps.join('|').trim();if(!n0){n0=t0;t0='-'}var o={t:t0,n:n0};if(!/lab|tutorial/i.test(n0))o.s=n0;return o});state.tt=ntt;ttDirty=false;n++}
     else if(a.do==='out'&&dre.test(a.date||'')){if(a.on)state.off[a.date]=1;else delete state.off[a.date];n++}
   }catch(e){}});
   if(n){replanAll();touch();renderAll()}else undoSnap=null;
