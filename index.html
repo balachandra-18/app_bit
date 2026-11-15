@@ -179,6 +179,8 @@ summary{cursor:pointer;font-weight:600;font-size:14px}
       <h3 style="margin-top:16px">Sync between devices</h3>
       <label class="f">Firebase config (paste the block from your Firebase project)<textarea id="fb-cfg" placeholder="apiKey: ..., authDomain: ..., projectId: ..., appId: ..."></textarea></label>
       <div class="cbtns"><button class="ghost" type="button" data-act="fbsave">Save and connect</button><button class="ghost" type="button" data-act="fbin">Sign in with Google</button><button class="ghost" type="button" data-act="fbout">Sign out</button></div>
+      <div class="grid" style="margin-top:10px"><label class="f">Email (no popup needed)<input type="text" id="fb-em" autocomplete="username" inputmode="email"></label><label class="f">Password (6+ characters)<input type="password" id="fb-pw" autocomplete="current-password"></label></div>
+      <div class="cbtns"><button class="ghost" type="button" data-act="fbemail">Sign in with email</button><button class="ghost" type="button" data-act="fbnew">Create account</button></div>
       <p class="s" id="fb-status" style="margin-top:8px"></p>
       <p class="s" style="margin-top:8px">Without sync, data lives in this browser only. Export and import backups to move it by hand.</p>
     </details>
@@ -631,6 +633,9 @@ document.addEventListener('click',function(e){
     try{localStorage.setItem('bit-fb-config',JSON.stringify(cfg))}catch(x){}
     fbStatus('Connecting...');fbStart(cfg).then(function(){fbStatus('Connected. Now sign in with Google.')}).catch(function(err){fbStatus(err.message)});return}
   if(a==='fbin'){if(!fbAuth){fbStatus('Save and connect the config first.');return}fbAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(function(err){fbStatus('Sign-in failed: '+err.message)});return}
+  if(a==='fbemail'||a==='fbnew'){if(!fbAuth){fbStatus('Save and connect the config first.');return}
+    var em=$('#fb-em').value.trim(),pw=$('#fb-pw').value;if(!em||pw.length<6){fbStatus('Enter an email and a password of 6+ characters.');return}
+    (a==='fbnew'?fbAuth.createUserWithEmailAndPassword(em,pw):fbAuth.signInWithEmailAndPassword(em,pw)).catch(function(err){fbStatus('Sign-in failed: '+err.message)});return}
   if(a==='fbout'){if(fbAuth)fbAuth.signOut();return}
   if(a==='nact'){var nt=cleanNotice($('#n-text').value);if(!nt)return;runAssistant('This is a WhatsApp notice from my college. Make whatever changes it implies to my planner: add deadlines or tests, move or edit existing tasks, mark days as holiday, add syllabus topics. Notice:\n'+nt);$('#assist').scrollIntoView({behavior:'smooth',block:'start'});return}
   if(a==='ask'){runAssistant();return}
