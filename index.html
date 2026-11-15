@@ -169,6 +169,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
   <header id="hdr"></header>
   <nav id="strip" class="strip" aria-label="Pick a day"></nav>
   <section id="day" class="card" aria-live="polite"></section>
+  <section id="targets" class="card"></section>
 
   <section id="addcard" class="card">
     <h3>Add an assignment or deadline</h3>
@@ -203,6 +204,14 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
     <div id="addmsg" role="status"></div>
   </section>
 
+  <section id="exams" class="card">
+    <h3>Exams</h3>
+    <p class="muted" style="font-size:14px">Add each test or exam. On test days the plan switches to reading only the next exam's subject, and study targets count down to each exam date.</p>
+    <div class="grid"><label class="f">Date<input type="date" id="e-d"></label><label class="f">Subject<input type="text" id="e-s" list="e-sl" placeholder="e.g. Physics" maxlength="40"></label><label class="f">Time (optional)<input type="text" id="e-t" placeholder="10:00 AM" maxlength="12"></label></div>
+    <datalist id="e-sl"><option value="Mathematics-I"><option value="Physics"><option value="CAED"><option value="IEC"><option value="Programming in C"></datalist>
+    <div class="cbtns"><button class="btn" type="button" data-act="examadd">Add exam</button></div>
+    <div id="e-list"></div>
+  </section>
   <section id="busy" class="card">
     <h3>Not free</h3>
     <p class="muted" style="font-size:14px">Block hours when you cannot study. Tasks are planned around them. Leave "To date" empty for a single day.</p>
@@ -239,6 +248,13 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
   </section>
   <section id="deadlines" class="card"></section>
   <section id="cprog" class="card"></section>
+  <section id="ttcard" class="card">
+    <h3>My timetable</h3>
+    <p class="muted" style="font-size:14px">One class per line as: time | subject. Use the same subject names as the Syllabus card so topics match. Leave a weekday empty if you have no classes that day.</p>
+    <div id="tt-edit"></div>
+    <div class="cbtns"><button class="btn" type="button" data-act="ttsave">Save timetable</button><button class="ghost" type="button" data-act="ttreset">Reset to the original</button></div>
+    <div id="tt-msg" class="s" role="status" style="margin-top:8px"></div>
+  </section>
   <section id="syl" class="card"></section>
   <section id="dates" class="card"></section>
   <section id="notes" class="card">
@@ -299,15 +315,15 @@ function $(s){return document.querySelector(s)}
 
 function defaults(){return {v:1,savedAt:0,batch:'A',tasks:[],
   recurring:[{id:'phy-rec',title:'Physics lab record',kind:'lab',mins:90,dow:1,time:'08:00'},{id:'caed-tut',title:'CAED tutorial',kind:'tut',mins:120,dow:2,time:'08:00'}],
-  doneBlocks:{},syl:[],cLog:{},topics:{},holidays:{},off:{},busy:{},gone:{},cMin:0,road:{},seeded:false}}
+  doneBlocks:{},syl:[],cLog:{},topics:{},holidays:{},off:{},busy:{},exams:[],mpt:40,gone:{},cMin:0,road:{},seeded:false}}
 var state=defaults(), sel=today(), pin=null, moveNote='', syncText='Loading…';
 
 /* ---------- day types and templates ---------- */
-function baseType(d){var w=d.getDay();if(w===0)return 'free';if(w===6){var n=Math.ceil(d.getDate()/7);return (n===1||n===3)?'free':'idt'}return 'college'}
+function baseType(d){var w=d.getDay();if(testOn(dk(d)))return 'test';if(w===0)return 'free';if(w===6){var n=Math.ceil(d.getDate()/7);return (n===1||n===3)?'free':'idt'}return (ttNow()[w]&&ttNow()[w].length)?'college':'free'}
 function dayType(d){return state.holidays[dk(d)]?'free':baseType(d)}
 function focus(d){var k=dk(d);if(k<='2026-11-25')return {name:'Test 2',mods:'next 1.5 modules'};if(k<='2026-12-26')return {name:'Test 3',mods:'last 2 modules'};return {name:'SEE',mods:'whole syllabus'}}
 function testOn(k){for(var i=0;i<TESTS.length;i++){if(k>=TESTS[i][0]&&k<=TESTS[i][1])return TESTS[i][2]}return ''}
-function classSubjects(d){var out=[];(TT[d.getDay()]||[]).forEach(function(x){if(x.s&&out.indexOf(x.s)<0)out.push(x.s)});return out}
+function classSubjects(d){var out=[];(ttNow()[d.getDay()]||[]).forEach(function(x){if(x.s&&out.indexOf(x.s)<0)out.push(x.s)});return out}
 function B(s,e,key,title,sub,kind){return {s:tm(s),e:tm(e),key:key,title:title,sub:sub||'',kind:kind}}
 function F(s,e){return {s:tm(s),e:tm(e)}}
 
@@ -319,6 +335,16 @@ function template(d){
   var cS=cDone?'Do the next open item in the C roadmap below':'Keep going: '+dur(left)+' of the 11 h video left';
   var studyT='Study: '+subj, studyS=f.name+' prep · '+f.mods+'. Find the lecture on YouTube and match it to the syllabus.';
   var stopT='Plan tomorrow · pack bag · hard stop';
+  if(type==='test'){
+    var tk=dk(d),ex=examsOn(tk),nx=nextExam(tk,true),tsub=nx?nx.subj:subj;
+    var tS=nx?'Exam on '+dlabel(nx.d)+(nx.time?' at '+nx.time:'')+'. Read only this subject today.':'Add your exam dates under Exams so this block targets the right subject.';
+    if(ex.length)return {label:'Test day · exam today ('+ex.map(function(x){return x.subj}).join(', ')+'), read for the next one',
+      blocks:[B('17:00','19:30','study','Study: '+tsub,tS,'study'),B('20:00','20:45','dinner','Dinner','','meal'),B('21:30','22:00','stop',stopT,'','stop')],
+      flex:[F('19:30','20:00'),F('20:45','21:30')]};
+    return {label:'Test day · no exam today, full study day',
+      blocks:[B('09:00','12:30','study','Study: '+tsub,tS,'study'),B('13:00','14:00','lunch','Lunch and rest','','meal'),B('14:00','17:00','study2','Second pass: '+tsub,'Redo what you could not recall this morning.','study'),B('17:00','17:30','b1','Break','','break'),B('20:00','20:45','dinner','Dinner','','meal'),B('21:30','22:00','stop',stopT,'','stop')],
+      flex:[F('12:30','13:00'),F('17:30','20:00'),F('20:45','21:30')]};
+  }
   if(type==='college'){
     var subs=classSubjects(d);
     return {label:'College day · evening block 6 PM to 10 PM',
@@ -357,11 +383,56 @@ function nextTopic(subj,day){
   var d1=l.filter(function(x){return x.done&&x.doneOn===day})[0];
   return d1||l.filter(function(x){return !x.done})[0]||null;
 }
-(function(){var o2=template;template=function(d){var t=o2(d),k=dk(d);
+var TPL0=null,WT=false;
+(function(){var o2=template;TPL0=o2;template=function(d){var t=o2(d),k=dk(d);
   t.blocks.forEach(function(b){
-    if(b.key==='study'){var tp=nextTopic(b.title.replace('Study: ',''),k);if(tp){b.topicId=tp.id;b.sub='Topic: '+tp.title+(tp.mod?' ('+tp.mod+')':'')+' · '+b.sub}}
+    if(b.key==='study'){var sj=b.title.replace('Study: ',''),tp=nextTopic(sj,k);if(tp){b.topicId=tp.id;var tg=WT?targetFor(sj,k,b):null;b.sub=(tg?tg.text:'Topic: '+tp.title+(tp.mod?' ('+tp.mod+')':''))+' · '+b.sub}}
     if(b.key==='topics'){var ups=[];classSubjects(d).forEach(function(s){var n=SMAP[s]||s,tp=nextTopic(n,k);if(tp)ups.push(n+': '+tp.title)});if(ups.length)b.sub+=' Syllabus next: '+ups.join(' · ')+'.'}
   });return t}})();
+
+/* ---------- exams, targets, timetable ---------- */
+var TT0=TT,ttDirty=false;
+function ttNow(){return (state.tt&&Object.keys(state.tt).length)?state.tt:TT0}
+function exams(){return (state.exams||[]).slice().sort(function(a,b){return a.d<b.d?-1:a.d>b.d?1:0})}
+function nextExam(k,strict){return exams().filter(function(x){return strict?x.d>k:x.d>=k})[0]||null}
+function examsOn(k){return exams().filter(function(x){return x.d===k})}
+function examDeadline(s,k){var e=exams().filter(function(x){return x.subj===s&&x.d>=k})[0];if(e)return e.d;for(var i=0;i<TESTS.length;i++){if(TESTS[i][0]>k)return TESTS[i][0]}return ''}
+function MPT(){return +state.mpt||40}
+function targetFor(subj,k,b){
+  var list=state.syl.filter(function(x){return x.subj===subj&&(!x.done||x.doneOn===k)});
+  if(!list.length)return null;
+  var dl=examDeadline(subj,k),n=0,len=0,nd='';
+  if(dl){for(var d=pd(k),i=0;dk(d)<dl&&i<120;d.setDate(d.getDate()+1),i++){TPL0(d).blocks.forEach(function(x){if(x.key==='study'&&x.title==='Study: '+subj){n++;len+=x.e-x.s;if(!nd)nd=dk(d)}})}}
+  var blen=b?b.e-b.s:(n?Math.round(len/n):90);
+  var per=dl?(n>0?Math.ceil(list.length/n):list.length):Math.max(1,Math.floor(blen/MPT()));
+  per=Math.min(per,list.length);
+  var pick=list.slice(0,per),mins=per*MPT();
+  var names=pick.slice(0,4).map(function(x){return x.title}).join(', ')+(pick.length>4?' and '+(pick.length-4)+' more':'');
+  var text='Target: '+per+' topic'+(per>1?'s':'')+' ('+names+')';
+  if(mins>blen)text+='. Needs about '+dur(mins)+', this block is '+dur(blen)+', so the rest should go in free slots';
+  return {ids:pick.map(function(x){return x.id}),per:per,n:n,len:len,dl:dl,nd:nd,text:text}}
+function renderTargets(){
+  var el=$('#targets');if(!el)return;
+  var k=today(),h='<h3>Study targets</h3>',any=false;
+  SUBJ.forEach(function(s){
+    var left=state.syl.filter(function(x){return x.subj===s&&!x.done}).length;if(!left)return;
+    var g=targetFor(s,k,null);if(!g)return;any=true;
+    var extra=Math.ceil(Math.max(0,left*MPT()-g.len)/15)*15;
+    h+='<div class="dl"><div class="dl-title">'+esc(s)+'</div><div class="s">'+left+' topic'+(left>1?'s':'')+' left'+(g.dl?' · exam '+dlabel(g.dl):' · no exam date set')+' · '+(g.n?g.n+' study block'+(g.n>1?'s':'')+' left':'no study block left')+' · about '+g.per+' per block</div>';
+    if(g.nd)h+='<div class="s">Next block: '+dlabel(g.nd)+'</div>';
+    h+='<ul class="road plain">'+g.ids.slice(0,8).map(function(id){var tp=state.syl.filter(function(x){return x.id===id})[0];return tp?'<li>'+checkbox('data-chk="syl" data-id="'+esc(id)+'"',tp.done,'Topic done: '+tp.title)+'<div><div class="t">'+esc(tp.title)+'</div><div class="s">'+esc(tp.mod||'')+'</div></div></li>':''}).join('')+'</ul>';
+    if(extra>0&&g.dl)h+='<div class="s" style="color:var(--warn)">Your study blocks give '+dur(g.len)+' but these topics need about '+dur(left*MPT())+'.</div><div class="dl-actions"><button class="ghost sm" type="button" data-act="xtra" data-id="'+esc(s)+'">Add '+dur(extra)+' extra to my free slots</button></div>';
+    h+='</div>'});
+  if(!any)h+='<p class="muted" style="font-size:14px;margin-top:6px">Add your syllabus topics in the Syllabus card and your exam dates under Exams. Then each study block gets a target here.</p>';
+  h+='<label class="f" style="margin-top:12px;max-width:200px">Minutes per topic<input type="number" id="mpt" min="10" max="180" value="'+MPT()+'"></label>';
+  el.innerHTML=h}
+function renderExams(){
+  var el=$('#e-list');if(!el)return;
+  el.innerHTML=exams().map(function(x){return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px;font-size:14px"><span>'+esc(dlabel(x.d))+' · '+esc(x.subj)+(x.time?' · '+esc(x.time):'')+'</span><button class="linkbtn" type="button" data-act="examdel" data-id="'+esc(x.id)+'">remove</button></div>'}).join('')}
+function ttText(w){return (ttNow()[w]||[]).map(function(x){return (x.t||'')+' | '+(x.n||(x.lab?x.lab.A+' / '+x.lab.B:''))}).join('\n')}
+function renderTT(){
+  var el=$('#tt-edit');if(!el)return;
+  el.innerHTML=[1,2,3,4,5,6].map(function(w){return '<label class="f" style="margin-top:10px">'+DOW[w]+'<textarea id="tt-'+w+'" style="min-height:70px">'+esc(ttText(w))+'</textarea></label>'}).join('')}
 
 /* ---------- scheduling ---------- */
 function subtract(spans,s,e){var out=[];spans.forEach(function(x){if(e<=x.s||s>=x.e){out.push(x);return}if(s>x.s)out.push({s:x.s,e:s});if(e<x.e)out.push({s:e,e:x.e})});return out}
@@ -547,12 +618,12 @@ function renderDay(){
   var h='<div class="dayhead"><div><h2>'+(isT?'Today · ':'')+DOW[d.getDay()]+' '+d.getDate()+' '+MON[d.getMonth()]+'</h2><p class="muted" style="font-size:14px;margin-top:2px">'+tpl.label+'</p></div><div class="count">'+done+' / '+total+' done</div></div>';
   h+='<div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="'+total+'" aria-valuenow="'+done+'"><i style="width:'+(total?Math.round(done/total*100):0)+'%"></i></div>';
   var tn=testOn(sel);
-  if(tn)h+='<div class="banner">'+tn+' day. Add the exact subject and time as a task so it shows here.</div>';
+  if(tn){var exd=examsOn(sel);h+='<div class="banner">'+tn+' day. '+(exd.length?'Exam today: '+exd.map(function(x){return esc(x.subj)+(x.time?' at '+esc(x.time):'')}).join(', ')+'.':'No exam added for today. Add your exam dates under Exams.')+'</div>'}
   if(type==='college'){
     h+='<label class="f" style="margin-top:14px">What was taught today (type it, this is your revision list)<textarea id="topics" placeholder="e.g. Maths: partial differentiation · Physics: de Broglie waves">'+esc(state.topics[sel]||'')+'</textarea></label>';
   }
   h+='<ul class="sched">'+rows.map(function(r){return rowHtml(r,isT,nm)}).join('')+'</ul>';
-  var cls=TT[d.getDay()]||[];
+  var cls=ttNow()[d.getDay()]||[];
   if(cls.length){
     h+='<details><summary>Classes this day</summary><div class="batch" role="group" aria-label="Your lab batch"><button class="ghost sm" data-act="batch" data-b="A" aria-pressed="'+(state.batch==='A')+'">Batches 1+2</button><button class="ghost sm" data-act="batch" data-b="B" aria-pressed="'+(state.batch==='B')+'">Batches 3+4</button></div><ul class="cls">'+
       cls.map(function(x){var name=x.lab?x.lab[state.batch]:x.n;return '<li><b>'+x.t+'</b><span>'+esc(name)+(x.note?'<br><span class="muted" style="font-size:12px">'+esc(x.note)+'</span>':'')+'</span></li>'}).join('')+'</ul></details>';
@@ -653,7 +724,7 @@ function renderBusy(){
   ks.forEach(function(k){state.busy[k].forEach(function(b,i){
     h+='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px;font-size:14px"><span>'+esc(k)+' · '+pad(Math.floor(b.s/60))+':'+pad(b.s%60)+' to '+pad(Math.floor(b.e/60))+':'+pad(b.e%60)+'</span><button class="linkbtn" type="button" data-act="busydel" data-id="'+esc(k+'|'+i)+'">remove</button></div>'})});
   el.innerHTML=h}
-function renderAll(){renderHdr();renderStrip();renderDay();renderDeadlines();renderC();renderBusy();renderSyl();renderDates();renderRoad()}
+function renderAll(){renderHdr();renderStrip();renderDay();renderDeadlines();renderC();renderBusy();renderTargets();renderExams();if(!ttDirty)renderTT();renderSyl();renderDates();renderRoad()}
 
 /* ---------- actions ---------- */
 function find(id){return state.tasks.filter(function(t){return t.id===id})[0]}
@@ -705,6 +776,17 @@ document.addEventListener('click',function(e){
     for(var dd=pd(d1);dk(dd)<=d2&&n2<60;dd.setDate(dd.getDate()+1),n2++){var kk=dk(dd);(state.busy[kk]=state.busy[kk]||[]).push({s:tm(t1),e:tm(t2)})}
     replanAll();touch();renderAll();bm.textContent='Blocked '+t1+' to '+t2+' on '+n2+' day'+(n2>1?'s':'')+'.';return}
   if(a==='busydel'){var pr=String(id).split('|'),arr=state.busy&&state.busy[pr[0]];if(arr){arr.splice(+pr[1],1);if(!arr.length)delete state.busy[pr[0]];replanAll();touch();renderAll()}return}
+  if(a==='examadd'){var ed=$('#e-d').value,es=$('#e-s').value.trim(),et=$('#e-t').value.trim();if(!ed||!es)return;state.exams=state.exams||[];state.exams.push({id:'e'+Date.now().toString(36)+Math.random().toString(36).slice(2,4),d:ed,subj:es.slice(0,40),time:et});$('#e-s').value='';$('#e-t').value='';touch();renderAll();return}
+  if(a==='examdel'){state.exams=(state.exams||[]).filter(function(x){return x.id!==id});touch();renderAll();return}
+  if(a==='ttsave'){var nt={};[1,2,3,4,5,6].forEach(function(w){var v=($('#tt-'+w).value||'').trim();if(v===ttText(w).trim()){nt[w]=ttNow()[w]||[];return}
+      nt[w]=v?v.split('\n').map(function(l){return l.trim()}).filter(Boolean).map(function(l){var ps=l.split('|'),t0=ps.shift().trim(),n0=ps.join('|').trim();if(!n0){n0=t0;t0='-'}var o={t:t0,n:n0};if(!/lab|tutorial/i.test(n0))o.s=n0;return o}):[]});
+    state.tt=nt;ttDirty=false;replanAll();touch();renderAll();$('#tt-msg').textContent='Timetable saved. Tasks were replanned around it.';return}
+  if(a==='ttreset'){delete state.tt;ttDirty=false;replanAll();touch();renderAll();$('#tt-msg').textContent='Back to the original timetable.';return}
+  if(a==='xtra'){var g3=targetFor(id,today(),null);if(!g3||!g3.dl){dlNote={t:'Add an exam date for '+id+' first.',at:Date.now()};renderAll();return}
+    var need=Math.max(15,Math.ceil((state.syl.filter(function(x){return x.subj===id&&!x.done}).length*MPT()-g3.len)/15)*15),d0=pd(g3.dl);d0.setDate(d0.getDate()-1);
+    var due=dk(d0)+'T22:00',tx=find('x-'+id);
+    if(tx){tx.mins=need;tx.due=due;tx.forced=false}else state.tasks.push({id:'x-'+id,title:'Extra reading: '+id,kind:'prep',mins:need,due:due,forced:false,slots:[],short:0});
+    replanAll();tx=find('x-'+id);dlNote={t:'Extra reading for '+id+': '+(tx&&tx.short>0?dur(tx.short)+" still doesn't fit before the exam.":'placed in your free slots.'),at:Date.now()};touch();renderAll();return}
   if(a==='fbsave'){var cfg=parseFb($('#fb-cfg').value);if(!cfg.apiKey||!cfg.projectId){fbStatus('The config needs at least apiKey and projectId.');return}
     try{localStorage.setItem('bit-fb-config',JSON.stringify(cfg))}catch(x){}
     fbStatus('Connecting...');fbStart(cfg).then(function(){fbStatus('Connected. Now sign in with Google.')}).catch(function(err){fbStatus(err.message)});return}
@@ -727,10 +809,10 @@ document.addEventListener('change',function(e){
     else{delete state.doneBlocks[key];if(c.getAttribute('data-key')==='c')creditC(false)}}
   else if(ty==='slot'){var t=find(c.getAttribute('data-id'));if(!t)return;var sl=t.slots[+c.getAttribute('data-i')];if(!sl)return;sl.done=c.checked;if(!c.checked)t.forced=false}
   else if(ty==='road'){state.road[c.getAttribute('data-key')]=c.checked}
-  else if(ty==='syl'){var tp2=state.syl.filter(function(x){return x.id===c.getAttribute('data-id')})[0];if(tp2){tp2.done=c.checked;if(!c.checked)delete tp2.doneOn}}
+  else if(ty==='syl'){var tp2=state.syl.filter(function(x){return x.id===c.getAttribute('data-id')})[0];if(tp2){tp2.done=c.checked;if(c.checked)tp2.doneOn=today();else delete tp2.doneOn}}
   else if(ty==='hol'){if(c.checked)state.holidays[sel]=1;else delete state.holidays[sel];replanAll()}
   else if(ty==='off'){if(c.checked)state.off[sel]=1;else delete state.off[sel];replanAll()}
-  if(ty==='blk'&&c.getAttribute('data-key')==='study'){var bb=template(pd(sel)).blocks.filter(function(x){return x.key==='study'})[0],tp=bb&&state.syl.filter(function(x){return x.id===bb.topicId})[0];if(tp){if(c.checked){tp.done=true;tp.doneOn=sel}else if(tp.doneOn===sel){tp.done=false;delete tp.doneOn}}}
+  if(ty==='blk'&&c.getAttribute('data-key')==='study'){var bb=template(pd(sel)).blocks.filter(function(x){return x.key==='study'})[0];if(bb){var tg2=targetFor(bb.title.replace('Study: ',''),sel,bb);(tg2?tg2.ids:[]).forEach(function(i2){var tp=state.syl.filter(function(x){return x.id===i2})[0];if(tp){if(c.checked){tp.done=true;tp.doneOn=sel}else if(tp.doneOn===sel){tp.done=false;delete tp.doneOn}}})}}
   touch();renderAll();
 });
 var topicTimer=null;
@@ -802,6 +884,8 @@ function addAiTopics(o){
   if(!o||!o.topics||!o.topics.length||SUBJ.indexOf(o.subject)<0)return;
   o.topics.forEach(function(x,i){x=String(x).trim();if(x&&!state.syl.some(function(y){return y.subj===o.subject&&y.title===x}))state.syl.push({id:'y'+Date.now().toString(36)+i,subj:o.subject,mod:'From notice',title:x.slice(0,120),done:false})});
   touch();renderAll()}
+document.addEventListener('input',function(e){if(e.target.closest&&e.target.closest('#tt-edit'))ttDirty=true});
+document.addEventListener('change',function(e){if(e.target.id==='mpt'){state.mpt=Math.min(180,Math.max(10,+e.target.value||40));touch();renderAll()}});
 document.addEventListener('change',function(e){
   if(e.target.id!=='n-file')return;
   var f=e.target.files[0];if(!f)return;
@@ -829,7 +913,7 @@ function fbStart(cfg){
         if(snap.metadata.hasPendingWrites)return;
         var remote=null;
         if(snap.exists){try{remote=JSON.parse(snap.data().state)}catch(e){}}
-        if(remote&&(remote.savedAt||0)>(state.savedAt||0)){state=Object.assign(defaults(),remote);persistLocal();boot();renderAll()}
+        if(remote&&(remote.savedAt||0)>(state.savedAt||0)){state=Object.assign(defaults(),remote);persistLocal();boot();if(!state.mig2){state.mig2=1;replanAll()}renderAll()}
         else if(!remote||(remote.savedAt||0)<(state.savedAt||0)){state.savedAt=state.savedAt||Date.now();dirty=true}
         loaded=true;syncText='Synced to your account';renderHdr();flush();
       },function(err){syncText='Sync error, kept on this device';renderHdr();fbStatus('Sync error: '+err.message)});
@@ -872,6 +956,7 @@ function applyActions(o){
   if(n){replanAll();touch();renderAll()}else undoSnap=null;
   aMsg((o&&o.reply?o.reply+' ':'')+(n?'('+n+' change'+(n>1?'s':'')+' made.)':'(No changes made.)'),false,!!n)}
 
+var _rd0=renderDay;renderDay=function(){WT=true;try{_rd0()}finally{WT=false}};
 var tm0=new Date();tm0.setDate(tm0.getDate()+1);
 $('#f-date').value=dk(tm0);$('#f-date').min=today();
 init();
@@ -880,6 +965,7 @@ try{$('#n-model').value=localStorage.getItem('bit-gemini-model')||''}catch(e){}
 try{var fc=localStorage.getItem('bit-fb-config');if(fc){var cf=JSON.parse(fc);$('#fb-cfg').value=JSON.stringify(cf);fbStart(cf).catch(function(err){fbStatus(err.message)})}}catch(e){}
 var q=new URLSearchParams(location.search),sh=[q.get('title'),q.get('text'),q.get('url')].filter(Boolean).join('\n');
 if(sh){$('#n-text').value=sh;var ct=cleanNotice(sh);if(ct)applyNotice(parseNotice(ct),'Shared notice. ')}
+if(!state.mig2){state.mig2=1;replanAll();touch()}
 document.addEventListener('click',function(e){if(navigator.vibrate&&e.target.closest&&e.target.closest('button,.chk,.dchip'))try{navigator.vibrate(8)}catch(x){}},{passive:true});
 if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(function(){});
 })();
