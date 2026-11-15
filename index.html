@@ -1,0 +1,803 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>BIT Study Tracker</title>
+<link rel="manifest" href="manifest.json"><meta name="theme-color" content="#2B5FD9"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one column logbook. Day strip, time-blocked day, add-deadline form, deadlines, C progress, key dates, C roadmap.
+   Type: IBM Plex Sans for reading, IBM Plex Mono for times and labels. */
+:root{
+  --bg:#F2F4F8; --surface:#FFFFFF; --ink:#16203A; --muted:#5B6783; --line:#DCE1EB;
+  --accent:#2B5FD9; --accent-ink:#FFFFFF; --soft:#E8EEFB;
+  --ok:#1E8E5A; --okbg:#E1F3EA; --warn:#9A5B00; --warnbg:#FFF0D6; --bad:#B8362A; --badbg:#FBE5E2;
+  --study:#2B5FD9; --code:#7A3FD1; --task:#9A5B00; --rest:#66728B;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E131B; --surface:#161D29; --ink:#E7ECF5; --muted:#93A0B8; --line:#263044;
+    --accent:#7FA6FF; --accent-ink:#0B1220; --soft:#1C2740;
+    --ok:#4CC38A; --okbg:#15291F; --warn:#F0B05A; --warnbg:#2E2414; --bad:#FF8A7A; --badbg:#321A18;
+    --study:#7FA6FF; --code:#B99BFF; --task:#F0B05A; --rest:#93A0B8; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E131B; --surface:#161D29; --ink:#E7ECF5; --muted:#93A0B8; --line:#263044;
+  --accent:#7FA6FF; --accent-ink:#0B1220; --soft:#1C2740;
+  --ok:#4CC38A; --okbg:#15291F; --warn:#F0B05A; --warnbg:#2E2414; --bad:#FF8A7A; --badbg:#321A18;
+  --study:#7FA6FF; --code:#B99BFF; --task:#F0B05A; --rest:#93A0B8; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  padding-block:18px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.mono{font-family:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace}
+h1{font-size:24px;line-height:1.15;margin:2px 0 10px;font-weight:600;letter-spacing:-.01em;text-wrap:balance}
+h2{font-size:17px;line-height:1.25;margin:0;font-weight:600;text-wrap:balance}
+h3{font-size:12px;margin:0 0 10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-family:'IBM Plex Mono',ui-monospace,monospace}
+p{margin:0}
+.muted{color:var(--muted)}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;padding:4px 10px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font:500 12px 'IBM Plex Mono',ui-monospace,monospace;min-width:0}
+.chip.warn{background:var(--warnbg);color:var(--warn);border-color:transparent}
+.chip.hot{background:var(--soft);color:var(--accent);border-color:transparent}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}
+.strip{display:flex;gap:8px;overflow-x:auto;padding:2px 0 6px;scrollbar-width:thin}
+.dchip{flex:0 0 auto;min-width:60px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:8px 6px 7px;
+  display:flex;flex-direction:column;align-items:center;gap:1px;font:inherit;cursor:pointer}
+.dchip b{font:600 11px 'IBM Plex Mono',ui-monospace,monospace;letter-spacing:.06em;text-transform:uppercase}
+.dchip span.n{font-size:19px;font-weight:600;line-height:1.2}
+.dchip small{font:500 10px 'IBM Plex Mono',ui-monospace,monospace;opacity:.75;height:13px}
+.dchip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.dchip:focus-visible,.btn:focus-visible,.ghost:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.dayhead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px}
+.count{font:600 13px 'IBM Plex Mono',ui-monospace,monospace;white-space:nowrap;color:var(--muted)}
+.bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--ok);border-radius:99px}
+.bar.code>i{background:var(--code)}
+.banner{margin:12px 0 0;padding:9px 12px;border-radius:8px;background:var(--warnbg);color:var(--warn);font-weight:500;font-size:14px}
+.note{margin-top:12px;padding:9px 12px;border-radius:8px;background:var(--soft);font-size:14px}
+ul.sched,ul.plain{list-style:none;margin:14px 0 0;padding:0}
+.row{display:grid;grid-template-columns:84px minmax(0,1fr) auto;gap:10px;align-items:start;padding:12px 0;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.when b{display:block;font:600 12.5px 'IBM Plex Mono',ui-monospace,monospace}
+.when span{display:block;font:500 11px 'IBM Plex Mono',ui-monospace,monospace;color:var(--muted)}
+.t{font-weight:500;overflow-wrap:anywhere}
+.s{font-size:13px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
+.tag{display:block;font:600 10.5px 'IBM Plex Mono',ui-monospace,monospace;letter-spacing:.07em;text-transform:uppercase;margin-bottom:2px}
+.k-study .tag{color:var(--study)} .k-code .tag{color:var(--code)} .k-task .tag{color:var(--task)}
+.k-break .tag,.k-meal .tag,.k-stop .tag,.free .tag{color:var(--rest)}
+.row.k-break,.row.k-meal{opacity:.8}
+.row.free{border-top:1px dashed var(--line);color:var(--muted)}
+.row.done .t{text-decoration:line-through;color:var(--muted)}
+.row.live{background:var(--soft);margin:0 -10px;padding-left:10px;padding-right:10px;border-radius:8px;border-top-color:transparent}
+.row.past:not(.done){opacity:.65}
+.now{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:5px;background:var(--accent);color:var(--accent-ink);font:600 10px 'IBM Plex Mono',ui-monospace,monospace;letter-spacing:.06em;vertical-align:1px}
+.chk{position:relative;display:inline-block;width:28px;height:28px;flex:none}
+.chk input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.chk span{display:block;width:28px;height:28px;border:2px solid var(--line);border-radius:8px;background:var(--bg)}
+.chk input:checked+span{background:var(--ok);border-color:var(--ok)}
+.chk input:checked+span::after{content:"";display:block;width:6px;height:12px;border:solid #fff;border-width:0 2.5px 2.5px 0;transform:translate(8px,3px) rotate(45deg)}
+.chk input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+.btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:9px;padding:11px 16px;font:600 14px 'IBM Plex Sans',system-ui,sans-serif;cursor:pointer}
+.ghost{background:transparent;color:var(--accent);border:1px solid var(--line);border-radius:8px;padding:7px 11px;font:500 13px 'IBM Plex Sans',system-ui,sans-serif;cursor:pointer}
+.ghost.sm{padding:5px 9px;font-size:12px}
+.ghost.danger{color:var(--bad)}
+.linkbtn{background:none;border:0;padding:0;color:var(--accent);font:500 13px 'IBM Plex Sans',system-ui,sans-serif;cursor:pointer;text-align:left;text-decoration:underline;text-underline-offset:2px}
+label.f{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--muted);min-width:0}
+input[type=text],input[type=date],input[type=time],input[type=number],select,textarea{font:inherit;font-size:15px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;min-width:0}
+textarea{resize:vertical;min-height:64px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}
+.grid .full{grid-column:1/-1}
+.msg{margin-top:12px;padding:10px 12px;border-radius:8px;background:var(--okbg);color:var(--ok);font-size:14px}
+.msg.bad{background:var(--badbg);color:var(--bad)}
+.pin{display:inline-flex;gap:8px;align-items:center;margin-top:12px;padding:5px 6px 5px 11px;border-radius:99px;background:var(--soft);font:500 12px 'IBM Plex Mono',ui-monospace,monospace}
+.dl{padding:14px 0;border-top:1px solid var(--line)}
+.dl:first-child{border-top:0;padding-top:4px}
+.dl-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px}
+.badge{display:inline-block;padding:2px 8px;border-radius:6px;font:600 10.5px 'IBM Plex Mono',ui-monospace,monospace;letter-spacing:.06em;text-transform:uppercase;background:var(--soft);color:var(--accent)}
+.badge.ok{background:var(--okbg);color:var(--ok)} .badge.warn{background:var(--warnbg);color:var(--warn)} .badge.bad{background:var(--badbg);color:var(--bad)}
+.dl-title{font-weight:600}
+.dl-plan{margin-top:6px;display:flex;flex-wrap:wrap;gap:4px 14px}
+.dl-actions{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px}
+.batch{display:inline-flex;gap:6px;margin-top:6px}
+.batch .ghost[aria-pressed="true"]{background:var(--soft);border-color:transparent;font-weight:600}
+details{margin-top:12px}
+summary{cursor:pointer;font-weight:600;font-size:14px}
+.cls{margin:8px 0 0;padding:0;list-style:none;font-size:14px}
+.cls li{display:flex;gap:10px;padding:4px 0}
+.cls b{flex:0 0 78px;font:500 12px 'IBM Plex Mono',ui-monospace,monospace;color:var(--muted);padding-top:2px}
+.road li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;padding:11px 0;border-top:1px solid var(--line)}
+.road li:first-child{border-top:0}
+.kd{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--line)}
+.kd:first-of-type{border-top:0}
+.kd span.d{font:500 12px 'IBM Plex Mono',ui-monospace,monospace;color:var(--muted);white-space:nowrap}
+.big{font:600 30px/1.1 'IBM Plex Mono',ui-monospace,monospace;letter-spacing:-.02em}
+.cbtns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
+.cbtns input{width:92px}
+.foot{font-size:12px;color:var(--muted)}
+.kd a{color:var(--accent);font-weight:500}
+.kd .s{margin:0;text-align:right}
+@media (max-width:420px){.grid{grid-template-columns:1fr}.row{grid-template-columns:72px minmax(0,1fr) auto;gap:8px}}
+@media (prefers-reduced-motion:no-preference){.dchip,.btn,.ghost{transition:background-color .15s,border-color .15s}}
+</style>
+
+<div class="wrap">
+  <header id="hdr"></header>
+  <nav id="strip" class="strip" aria-label="Pick a day"></nav>
+  <section id="day" class="card" aria-live="polite"></section>
+
+  <section id="addcard" class="card">
+    <h3>Add an assignment or deadline</h3>
+    <p class="muted" style="font-size:14px">It goes into the earliest free slot before the deadline. Nothing is placed after 10 PM.</p>
+    <form id="addform" autocomplete="off">
+      <div class="grid">
+        <label class="f full">What is it?
+          <input type="text" id="f-title" placeholder="e.g. Maths-I assignment 2, Quantum Physics lab record" maxlength="90" required>
+        </label>
+        <label class="f">Type
+          <select id="f-kind">
+            <option value="assign">Assignment</option><option value="lab">Lab record</option><option value="tut">Tutorial</option>
+            <option value="prep">Test prep</option><option value="code">C practice</option><option value="other">Other</option>
+          </select>
+        </label>
+        <label class="f">Time needed
+          <select id="f-mins">
+            <option value="30">30 min</option><option value="45">45 min</option><option value="60">1 hour</option>
+            <option value="90" selected>1.5 hours</option><option value="120">2 hours</option><option value="180">3 hours</option><option value="240">4 hours</option>
+          </select>
+        </label>
+        <label class="f">Due date
+          <input type="date" id="f-date" required>
+        </label>
+        <label class="f">Due time
+          <input type="time" id="f-time" value="08:00" required>
+        </label>
+      </div>
+      <div id="pinchip" class="pin" hidden></div>
+      <div style="margin-top:14px"><button class="btn" type="submit">Fit into my free slots</button></div>
+    </form>
+    <div id="addmsg" role="status"></div>
+  </section>
+
+  <section id="assist" class="card">
+    <h3>Ask the assistant</h3>
+    <p class="muted" style="font-size:14px">Tell it what to change, for example "move my Maths assignment to Friday 6 PM", "I am out on Saturday" or "add these Physics topics". It edits tasks, topics, holidays and days out, and you can undo. Needs the Gemini key under Settings and backup.</p>
+    <textarea id="a-q" placeholder="Ask or tell me a change" style="margin-top:12px"></textarea>
+    <div class="cbtns"><button class="btn" type="button" data-act="ask">Do it</button></div>
+    <div id="a-msg" role="status"></div>
+  </section>
+  <section id="notice" class="card">
+    <h3>Paste a college notice</h3>
+    <p class="muted" style="font-size:14px">Copy the WhatsApp message and paste it here. It fills the form above so you can check it before adding. After installing the app on Android you can also use Share, then pick this app, inside WhatsApp.</p>
+    <textarea id="n-text" placeholder="Paste notice text" style="margin-top:12px"></textarea>
+    <div class="cbtns"><button class="btn" type="button" data-act="nparse">Read notice</button><button class="ghost" type="button" data-act="nact">Apply notice with AI</button><button class="ghost" type="button" data-act="nai">Fill form with AI</button></div>
+    <div id="nmsg" role="status"></div>
+    <details><summary>Settings and backup</summary>
+      <label class="f" style="margin-top:10px">Gemini API key for "Read with AI" (free at aistudio.google.com, kept only on this device)<input type="text" id="n-key" autocomplete="off" placeholder="AIza..."></label>
+      <div class="cbtns"><button class="ghost" type="button" data-act="keysave">Save key</button><button class="ghost" type="button" data-act="export">Export backup</button><button class="ghost" type="button" data-act="import">Import backup</button><input type="file" id="n-file" accept=".json" hidden></div>
+      <h3 style="margin-top:16px">Sync between devices</h3>
+      <label class="f">Firebase config (paste the block from your Firebase project)<textarea id="fb-cfg" placeholder="apiKey: ..., authDomain: ..., projectId: ..., appId: ..."></textarea></label>
+      <div class="cbtns"><button class="ghost" type="button" data-act="fbsave">Save and connect</button><button class="ghost" type="button" data-act="fbin">Sign in with Google</button><button class="ghost" type="button" data-act="fbout">Sign out</button></div>
+      <p class="s" id="fb-status" style="margin-top:8px"></p>
+      <p class="s" style="margin-top:8px">Without sync, data lives in this browser only. Export and import backups to move it by hand.</p>
+    </details>
+  </section>
+  <section id="deadlines" class="card"></section>
+  <section id="cprog" class="card"></section>
+  <section id="syl" class="card"></section>
+  <section id="dates" class="card"></section>
+  <section id="notes" class="card">
+    <h3>Your notes in Drive (College folder)</h3>
+    <div class="kd"><a href="https://drive.google.com/drive/folders/198C6Xpi5Ck22JB3Wm5Pd8qYE8BlIHUqr" target="_blank" rel="noopener">Maths</a><span class="s">Module 1 and 2 question banks. Nothing for module 3 yet.</span></div>
+    <div class="kd"><a href="https://drive.google.com/drive/folders/1lyUM-FRKkPp16W4lxWWwUUG4J3C4pf-Y" target="_blank" rel="noopener">Physics</a><span class="s">Module 1 and 4 notes. Nothing for modules 2 and 3 yet.</span></div>
+    <div class="kd"><a href="https://drive.google.com/drive/folders/1KcZyJ_yQH2QMlTywBL6Z9f6tgzeCT5kc" target="_blank" rel="noopener">C notes</a><span class="s">Module 1 to 3 notes, question banks for 1 and 2, syllabus, lab manual.</span></div>
+    <div class="kd"><a href="https://drive.google.com/drive/folders/17OaGCWtBQisDHnwIAHKWJaxgNZCxpbhi" target="_blank" rel="noopener">C programs</a><span class="s">Your own .c files.</span></div>
+    <div class="kd"><a href="https://drive.google.com/drive/folders/1poWgN6SPutZ5iqJHgOw2R6d8rtwarHcw" target="_blank" rel="noopener">IEC</a><span class="s">Module 1 and 2 notes, question banks, solved examples.</span></div>
+    <div class="kd"><a href="https://drive.google.com/drive/folders/1DEWRCu8vi3YmsIOHs1FZyjx2w7brDZA0" target="_blank" rel="noopener">CAED</a><span class="s">Lab manual.</span></div>
+    <div class="kd"><a href="https://drive.google.com/drive/folders/1XHikFgdtL-8ZCw7F-PIAqkXkr67KZAFr" target="_blank" rel="noopener">Kannada</a><span class="s">Module 1 and 2 textbook with MCQs.</span></div>
+  </section>
+  <section id="road" class="card"></section>
+  <p class="foot">Built from your BIT first-semester calendar and the IC-I-A timetable. Class slots were read from a photo, so tell me if one is wrong.</p>
+</div>
+
+<script>
+(function(){
+'use strict';
+var DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
+    MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var LS='bit-study-tracker-v1', CTOT=660, CAP=120;
+var SUBJ=['Mathematics-I','Physics','CAED','IEC','Programming in C'];
+var KIND={assign:'Assignment',lab:'Lab record',tut:'Tutorial',prep:'Test prep',code:'C practice',other:'Other'};
+
+var TT={
+ 1:[{t:'8:00 AM',n:'Physics',s:'Physics'},{t:'9:00 AM',n:'IEC',s:'IEC'},{t:'10:30 AM',n:'C Programming',s:'C Programming'},{t:'11:30 AM',n:'Maths-I',s:'Maths-I'},{t:'Afternoon',lab:{A:'Physics Lab',B:'C Programming Lab'}}],
+ 2:[{t:'Morning',n:'CAED',s:'CAED',note:'Tutorial for batches 3+4, lecture for 1+2'}],
+ 3:[{t:'8:00 AM',n:'C Programming',s:'C Programming'},{t:'9:00 AM',n:'Maths-I',s:'Maths-I'}],
+ 4:[{t:'8:00 AM',n:'CAED',s:'CAED',note:'Tutorial for batches 1+2, lecture for 3+4'},{t:'10:30 AM',n:'IEC',s:'IEC'},{t:'11:30 AM',n:'Maths-I',s:'Maths-I'},{t:'12:30 PM',n:'Physics',s:'Physics'},{t:'Afternoon',lab:{A:'C Programming Lab',B:'Physics Lab'}}],
+ 5:[{t:'1:30 PM',n:'C Programming',s:'C Programming'},{t:'2:30 PM',n:'Maths-I',s:'Maths-I'},{t:'3:30 PM',n:'Physics',s:'Physics'},{t:'4:30 PM',n:'IEC',s:'IEC'}],
+ 6:[{t:'Saturday',n:'Innovation and Design Thinking Lab',note:'Held every Saturday except the 1st and 3rd of the month'}]
+};
+var TESTS=[['2026-11-23','2026-11-25','Test 2 CIE'],['2026-12-23','2026-12-26','Test 3 CIE'],['2026-12-28','2026-12-29','Improvement test']];
+var KD=[['2026-11-23','Test 2 CIE','23 to 25 Nov'],['2026-12-01','Test 2 marks on the Data Portal','1 Dec'],['2026-12-23','Test 3 CIE','23 to 26 Dec'],['2026-12-28','Improvement test','28 to 29 Dec'],['2027-01-01','Last working day','1 Jan'],['2027-01-04','SEE begins (tentative)','4 Jan']];
+var ROAD=[
+ {k:'r1',t:'Rebuild the video from memory',d:'Redo every example without watching: patterns, functions, arrays, strings. Aim for 40 programs typed from scratch.'},
+ {k:'r2',t:'Pointers, properly',d:'Pointer arithmetic, arrays versus pointers, pointer to pointer, function pointers, passing by address.'},
+ {k:'r3',t:'Memory, structs and bits',d:'malloc, calloc, realloc, free, structs, unions, enums, bit manipulation. Sketch the memory layout for each program.'},
+ {k:'r4',t:'Files, macros and tooling',d:'File handling, the preprocessor, multi-file programs with headers, debugging with gdb.'},
+ {k:'r5',t:'Data structures in C',d:'Linked list, stack, queue, binary tree, hash table. These also feed straight into your later courses.'},
+ {k:'r6',t:'Embedded-style C for IoT',d:'Fixed-width types, volatile, register-style bit tricks, then read one sensor in C on an Arduino or ESP32.'},
+ {k:'r7',t:'Daily habit and one project',d:'Two C problems a day on any online judge, plus one small build such as a sensor data logger.'}
+];
+
+function pad(n){return String(n).padStart(2,'0')}
+function dk(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+function pd(s){var p=s.split('-').map(Number);return new Date(p[0],p[1]-1,p[2])}
+function tm(s){var p=s.split(':').map(Number);return p[0]*60+p[1]}
+function h12(m){var h=Math.floor(m/60),mm=m%60;return (h%12||12)+':'+pad(mm)+' '+(h>=12?'PM':'AM')}
+function dur(m){return m>=60?Math.floor(m/60)+' h'+(m%60?' '+(m%60)+' min':''):m+' min'}
+function nowMin(){var n=new Date();return n.getHours()*60+n.getMinutes()}
+function today(){return dk(new Date())}
+function dlabel(k){var d=pd(k);return DOW[d.getDay()]+' '+d.getDate()+' '+MON[d.getMonth()]}
+function daysTo(k){return Math.round((pd(k)-pd(today()))/864e5)}
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function $(s){return document.querySelector(s)}
+
+function defaults(){return {v:1,savedAt:0,batch:'A',tasks:[],
+  recurring:[{id:'phy-rec',title:'Physics lab record',kind:'lab',mins:90,dow:1,time:'08:00'},{id:'caed-tut',title:'CAED tutorial',kind:'tut',mins:120,dow:2,time:'08:00'}],
+  doneBlocks:{},syl:[],cLog:{},topics:{},holidays:{},off:{},gone:{},cMin:0,road:{},seeded:false}}
+var state=defaults(), sel=today(), pin=null, moveNote='', syncText='Loading…';
+
+/* ---------- day types and templates ---------- */
+function baseType(d){var w=d.getDay();if(w===0)return 'free';if(w===6){var n=Math.ceil(d.getDate()/7);return (n===1||n===3)?'free':'idt'}return 'college'}
+function dayType(d){return state.holidays[dk(d)]?'free':baseType(d)}
+function focus(d){var k=dk(d);if(k<='2026-11-25')return {name:'Test 2',mods:'next 1.5 modules'};if(k<='2026-12-26')return {name:'Test 3',mods:'last 2 modules'};return {name:'SEE',mods:'whole syllabus'}}
+function testOn(k){for(var i=0;i<TESTS.length;i++){if(k>=TESTS[i][0]&&k<=TESTS[i][1])return TESTS[i][2]}return ''}
+function classSubjects(d){var out=[];(TT[d.getDay()]||[]).forEach(function(x){if(x.s&&out.indexOf(x.s)<0)out.push(x.s)});return out}
+function B(s,e,key,title,sub,kind){return {s:tm(s),e:tm(e),key:key,title:title,sub:sub||'',kind:kind}}
+function F(s,e){return {s:tm(s),e:tm(e)}}
+
+function template(d){
+  if(state.off[dk(d)])return {label:'You are out · nothing planned, tasks move to other days',blocks:[],flex:[]};
+  var type=dayType(d), f=focus(d), subj=SUBJ[Math.round(d.getTime()/864e5)%5];
+  var cDone=state.cMin>=CTOT, left=Math.max(0,CTOT-state.cMin);
+  var cT=cDone?'C mastery practice':'C programming · Code with Harry';
+  var cS=cDone?'Do the next open item in the C roadmap below':'Keep going: '+dur(left)+' of the 11 h video left';
+  var studyT='Study: '+subj, studyS=f.name+' prep · '+f.mods+'. Find the lecture on YouTube and match it to the syllabus.';
+  var stopT='Plan tomorrow · pack bag · hard stop';
+  if(type==='college'){
+    var subs=classSubjects(d);
+    return {label:'College day · evening block 6 PM to 10 PM',
+      blocks:[B('18:00','19:00','topics',"Today's class topics",subs.length?'Revise '+subs.join(' · ')+'. Find each topic on YouTube and match it to the syllabus.':'Find what was taught today on YouTube and match it to the syllabus.','study'),
+        B('19:00','19:15','b1','Break','','break'),
+        B('20:30','21:00','dinner','Dinner','','meal'),
+        B('21:00','21:45','c',cT,cS,'code'),
+        B('21:45','22:00','stop',stopT,'','stop')],
+      flex:[F('19:15','20:30')]};
+  }
+  if(type==='idt'){
+    return {label:'IDT lab Saturday · plan starts at 3 PM, after the lab',
+      blocks:[B('15:00','16:30','c',cT,cS,'code'),
+        B('16:30','17:00','b1','Break','','break'),
+        B('17:00','18:00','study',studyT.length?studyT.split('. ')[0]:studyT,studyS,'study'),
+        B('20:00','20:45','dinner','Dinner','','meal'),
+        B('21:30','22:00','stop',stopT,'','stop')],
+      flex:[F('18:00','20:00'),F('20:45','21:30')]};
+  }
+  return {label:'Free day · 9 AM to 10 PM',
+    blocks:[B('09:00','10:30','study',studyT,studyS,'study'),
+      B('11:00','12:30','c',cT,cS,'code'),
+      B('13:00','14:00','lunch','Lunch and rest','','meal'),
+      B('17:00','17:30','b1','Break','','break'),
+      B('20:00','20:45','dinner','Dinner','','meal'),
+      B('21:30','22:00','stop',stopT,'','stop')],
+    flex:[F('10:30','11:00'),F('12:30','13:00'),F('14:00','17:00'),F('17:30','20:00'),F('20:45','21:30')]};
+}
+/* the IDT study block title should read "Study: <subject>" */
+(function(){var orig=template;template=function(d){var t=orig(d);t.blocks.forEach(function(b){if(b.key==='study'&&b.title.indexOf('Study:')!==0){b.title='Study: '+SUBJ[Math.round(d.getTime()/864e5)%5]}});return t}})();
+
+/* ---------- syllabus topics ---------- */
+var SMAP={'Maths-I':'Mathematics-I','C Programming':'Programming in C'};
+function nextTopic(subj,day){
+  var l=state.syl.filter(function(x){return x.subj===subj});
+  var d1=l.filter(function(x){return x.done&&x.doneOn===day})[0];
+  return d1||l.filter(function(x){return !x.done})[0]||null;
+}
+(function(){var o2=template;template=function(d){var t=o2(d),k=dk(d);
+  t.blocks.forEach(function(b){
+    if(b.key==='study'){var tp=nextTopic(b.title.replace('Study: ',''),k);if(tp){b.topicId=tp.id;b.sub='Topic: '+tp.title+(tp.mod?' ('+tp.mod+')':'')+' · '+b.sub}}
+    if(b.key==='topics'){var ups=[];classSubjects(d).forEach(function(s){var n=SMAP[s]||s,tp=nextTopic(n,k);if(tp)ups.push(n+': '+tp.title)});if(ups.length)b.sub+=' Syllabus next: '+ups.join(' · ')+'.'}
+  });return t}})();
+
+/* ---------- scheduling ---------- */
+function subtract(spans,s,e){var out=[];spans.forEach(function(x){if(e<=x.s||s>=x.e){out.push(x);return}if(s>x.s)out.push({s:x.s,e:s});if(e<x.e)out.push({s:e,e:x.e})});return out}
+function flexSpansFor(k){
+  if(k<today())return [];
+  var spans=template(pd(k)).flex.map(function(x){return {s:x.s,e:x.e}});
+  if(k===today()){var nm=Math.ceil((nowMin()+5)/15)*15;spans=spans.map(function(x){return {s:Math.max(x.s,nm),e:x.e}}).filter(function(x){return x.e>x.s})}
+  state.tasks.forEach(function(t){t.slots.forEach(function(sl){if(sl.d===k)spans=subtract(spans,sl.s,sl.e)})});
+  return spans.filter(function(x){return x.e-x.s>=15});
+}
+function plan(t,pn){
+  t.slots=t.slots.filter(function(s){return s.done});
+  var rem=t.mins-t.slots.reduce(function(a,s){return a+(s.e-s.s)},0);
+  t.short=0;
+  if(rem<=0)return;
+  var due=new Date(t.due), dueKey=dk(due), dueMin=due.getHours()*60+due.getMinutes(), days=[];
+  for(var d=pd(today());dk(d)<=dueKey&&days.length<60;d.setDate(d.getDate()+1))days.push(dk(d));
+  function spansFor(k){return flexSpansFor(k).map(function(x){return k===dueKey?{s:x.s,e:Math.min(x.e,dueMin)}:x}).filter(function(x){return x.e-x.s>=15})}
+  function put(k,s,len){t.slots.push({d:k,s:s,e:s+len,done:false});rem-=len}
+  var i,j,sp,list;
+  if(pn&&days.indexOf(pn.d)>=0){
+    list=spansFor(pn.d);
+    for(i=0;i<list.length;i++){sp=list[i];if(sp.s===pn.s){var len=Math.min(sp.e-sp.s,rem,CAP);if(len>=15)put(pn.d,sp.s,len);break}}
+  }
+  if(rem>0&&rem<=CAP){
+    outer:for(i=0;i<days.length;i++){list=spansFor(days[i]);for(j=0;j<list.length;j++){if(list[j].e-list[j].s>=rem){put(days[i],list[j].s,rem);break outer}}}
+  }
+  if(rem>0){
+    for(i=0;i<days.length&&rem>0;i++){list=spansFor(days[i]);
+      for(j=0;j<list.length&&rem>0;j++){var l2=Math.min(list[j].e-list[j].s,rem,CAP);if(l2<30&&l2<rem)continue;if(l2<15)continue;put(days[i],list[j].s,l2)}}
+  }
+  t.short=Math.max(0,rem);
+  t.slots.sort(function(a,b){return a.d<b.d?-1:a.d>b.d?1:a.s-b.s});
+}
+function isDone(t){return !!t.forced||(t.slots.length>0&&t.short===0&&t.slots.every(function(s){return s.done}))}
+function byDue(a,b){return a.due<b.due?-1:a.due>b.due?1:0}
+function replanAll(){
+  var open=state.tasks.filter(function(t){return !isDone(t)});
+  open.forEach(function(t){t.slots=t.slots.filter(function(s){return s.done})});
+  open.sort(byDue).forEach(function(t){plan(t)});
+}
+function rollover(){
+  var nm=nowMin(),tk=today(),n=0;
+  state.tasks.slice().sort(byDue).forEach(function(t){
+    if(isDone(t))return;
+    var missed=t.slots.some(function(s){return !s.done&&(s.d<tk||(s.d===tk&&s.e<=nm))});
+    if(missed){plan(t);n++}
+  });
+  return n;
+}
+function ensureRecurring(fresh){
+  var base=pd(today());
+  state.recurring.forEach(function(r){
+    for(var i=0;i<=14;i++){
+      var d=new Date(base);d.setDate(d.getDate()+i);
+      if(d.getDay()!==r.dow)continue;
+      var k=dk(d),id=r.id+'@'+k;
+      if(state.gone[id]||state.tasks.some(function(t){return t.id===id}))continue;
+      var due=k+'T'+r.time;
+      if(new Date(due)<new Date())continue;
+      var t={id:id,title:r.title,kind:r.kind,mins:r.mins,due:due,forced:false,slots:[],short:0,auto:true};
+      state.tasks.push(t);fresh.push(t);
+    }
+  });
+}
+function seed(fresh){
+  state.seeded=true;
+  var items=SUBJ.map(function(s,i){return {id:'seed-prep-'+i,title:'Test 2 prep · '+s+' (next 1.5 modules)',kind:'prep',mins:75,due:'2026-11-22T21:30'}});
+  items.push({id:'seed-asg2',title:'Assignment, quiz and self-study #2 (confirm subjects)',kind:'assign',mins:90,due:'2026-11-21T21:30'});
+  items.forEach(function(x){
+    if(new Date(x.due)<new Date())return;
+    var t={id:x.id,title:x.title,kind:x.kind,mins:x.mins,due:x.due,forced:false,slots:[],short:0};
+    state.tasks.push(t);fresh.push(t);
+  });
+}
+function boot(){
+  var fresh=[];
+  if(!state.seeded)seed(fresh);
+  ensureRecurring(fresh);
+  fresh.sort(byDue).forEach(function(t){plan(t)});
+  rollover();
+  persistLocal();
+}
+
+/* ---------- persistence ---------- */
+var ref=null,loaded=false,dirty=false,saving=false,saveTimer=null;
+function persistLocal(){try{localStorage.setItem(LS,JSON.stringify(state))}catch(e){}}
+function touch(){
+  state.savedAt=Date.now();persistLocal();dirty=true;
+  clearTimeout(saveTimer);saveTimer=setTimeout(flush,700);
+}
+function flush(){
+  if(!ref||!loaded||saving||!dirty)return;
+  saving=true;dirty=false;
+  ref.set({state:JSON.stringify(state),savedAt:state.savedAt}).then(function(){syncText='Saved to your account'}).catch(function(){syncText='Not synced, kept on this device'}).then(function(){saving=false;renderHdr();if(dirty)flush()});
+}
+function init(){
+  try{var raw=localStorage.getItem(LS);if(raw)state=Object.assign(defaults(),JSON.parse(raw))}catch(e){}
+  boot();renderAll();
+  var c=window.claude;
+  if(!c||!c.use){loaded=true;syncText='Saved on this device';renderHdr();return}
+  var timer=setTimeout(function(){syncText='Saved on this device (account sync not reachable yet)';renderHdr()},10000);
+  Promise.all([c.use('db'),c.use('user')]).then(function(r){
+    var db=r[0],user=r[1];
+    return (user?user.id():Promise.resolve(null)).then(function(id){
+      if(!db||!id){clearTimeout(timer);loaded=true;syncText='Saved on this device';renderHdr();return}
+      ref=db.doc('data/users/'+id+'/tracker');
+      return ref.get().then(function(snap){
+        clearTimeout(timer);
+        if(snap.exists){
+          var remote=null;try{remote=JSON.parse(snap.data().state)}catch(e){}
+          if(remote&&(remote.savedAt||0)>(state.savedAt||0)){state=Object.assign(defaults(),remote);boot();renderAll()}
+          else{state.savedAt=state.savedAt||Date.now();dirty=true}
+        }else{state.savedAt=state.savedAt||Date.now();dirty=true}
+        loaded=true;syncText='Saved to your account';renderHdr();flush();
+      });
+    });
+  }).catch(function(){clearTimeout(timer);loaded=true;syncText='Saved on this device';renderHdr()});
+}
+
+/* ---------- rendering ---------- */
+function stopText(){var nm=nowMin();return nm<1320?'Hard stop 10:00 PM · '+dur(1320-nm)+' left':'Past 10 PM · sleep, wake at 6'}
+function renderHdr(){
+  var nextT='',k=today();
+  for(var i=0;i<TESTS.length;i++){
+    if(TESTS[i][1]>=k){var dd=daysTo(TESTS[i][0]);nextT=TESTS[i][2]+' · '+(dd>0?'in '+dd+' day'+(dd>1?'s':''):dd===0?'today':'under way');break}
+  }
+  $('#hdr').innerHTML='<p class="eyebrow mono">BIT · CS(IoT) · Section IC-I-A · Sem 1</p><h1>Study Tracker</h1>'+
+    '<div class="chips">'+(nextT?'<span class="chip hot">'+esc(nextT)+'</span>':'')+
+    '<span class="chip" id="stopchip">'+stopText()+'</span><span class="chip">'+esc(syncText)+'</span></div>'+
+    (moveNote?'<div class="note">'+esc(moveNote)+'</div>':'');
+}
+function renderStrip(){
+  var h='',base=pd(today());
+  for(var i=0;i<10;i++){
+    var d=new Date(base);d.setDate(d.getDate()+i);var k=dk(d);
+    var open=0,due=0;
+    state.tasks.forEach(function(t){if(isDone(t))return;t.slots.forEach(function(s){if(s.d===k&&!s.done)open++});if(t.due.slice(0,10)===k)due++});
+    var tag=state.off[k]?'OUT':testOn(k)?'TEST':due?due+' due':open?open+' to do':'';
+    h+='<button class="dchip" data-act="day" data-k="'+k+'" aria-pressed="'+(k===sel)+'"><b>'+(i===0?'Today':DOW[d.getDay()])+'</b><span class="n">'+d.getDate()+'</span><small>'+tag+'</small></button>';
+  }
+  $('#strip').innerHTML=h;
+}
+function checkbox(attrs,on,label){return '<label class="chk"><input type="checkbox" '+attrs+(on?' checked':'')+' aria-label="'+esc(label)+'"><span></span></label>'}
+function rowHtml(r,isT,nm){
+  var past=isT&&nm>=r.e,live=isT&&nm>=r.s&&nm<r.e;
+  var when='<div class="when"><b>'+h12(r.s)+'</b><span>to '+h12(r.e)+'</span></div>';
+  if(r.kind==='free'){
+    return '<li class="row free">'+when+'<div class="what"><span class="tag">Free slot</span><div class="t">'+dur(r.e-r.s)+' open</div><div class="s">Room for an assignment or extra revision.</div></div><button class="ghost sm" data-act="pin" data-s="'+r.s+'" data-e="'+r.e+'">Add task</button></li>';
+  }
+  if(r.kind==='block'){
+    var b=r.b,chk=b.kind==='study'||b.kind==='code'||b.key==='stop',on=!!state.doneBlocks[sel+'|'+b.key];
+    var tg=b.kind==='study'?'Study':b.kind==='code'?'Code':b.key==='stop'?'Wrap up':b.kind==='meal'?'Meal':'Break';
+    return '<li class="row k-'+b.kind+(on?' done':'')+(live?' live':'')+(past&&chk&&!on?' past':'')+'">'+when+
+      '<div class="what"><span class="tag">'+tg+'</span><div class="t">'+esc(b.title)+(live?'<span class="now">NOW</span>':'')+'</div>'+(b.sub?'<div class="s">'+esc(b.sub)+'</div>':'')+'</div>'+
+      (chk?checkbox('data-chk="blk" data-key="'+b.key+'"',on,'Mark done: '+b.title):'<span></span>')+'</li>';
+  }
+  var t=r.t,sl=r.sl,parts=t.slots.length;
+  return '<li class="row k-task'+(sl.done?' done':'')+(live?' live':'')+(past&&!sl.done?' past':'')+'">'+when+
+    '<div class="what"><span class="tag">'+esc(KIND[t.kind]||'Task')+'</span><div class="t">'+esc(t.title)+(live?'<span class="now">NOW</span>':'')+'</div>'+
+    '<div class="s">Due '+dueText(t)+' · '+dur(sl.e-sl.s)+(parts>1?' · part '+(r.i+1)+' of '+parts:'')+'</div></div>'+
+    checkbox('data-chk="slot" data-id="'+esc(t.id)+'" data-i="'+r.i+'"',sl.done,'Mark done: '+t.title)+'</li>';
+}
+function dueText(t){var k=t.due.slice(0,10),m=tm(t.due.slice(11,16));return dlabel(k)+', '+h12(m)}
+function renderDay(){
+  var d=pd(sel),tpl=template(d),isT=sel===today(),nm=nowMin(),rows=[],type=dayType(d);
+  tpl.blocks.forEach(function(b){rows.push({s:b.s,e:b.e,kind:'block',b:b})});
+  state.tasks.forEach(function(t){t.slots.forEach(function(sl,i){if(sl.d===sel)rows.push({s:sl.s,e:sl.e,kind:'task',t:t,i:i,sl:sl})})});
+  flexSpansFor(sel).forEach(function(x){rows.push({s:x.s,e:x.e,kind:'free'})});
+  rows.sort(function(a,b){return a.s-b.s||a.e-b.e});
+  var total=0,done=0;
+  rows.forEach(function(r){
+    if(r.kind==='task'){total++;if(r.sl.done)done++}
+    else if(r.kind==='block'&&(r.b.kind==='study'||r.b.kind==='code'||r.b.key==='stop')){total++;if(state.doneBlocks[sel+'|'+r.b.key])done++}
+  });
+  var h='<div class="dayhead"><div><h2>'+(isT?'Today · ':'')+DOW[d.getDay()]+' '+d.getDate()+' '+MON[d.getMonth()]+'</h2><p class="muted" style="font-size:14px;margin-top:2px">'+tpl.label+'</p></div><div class="count">'+done+' / '+total+' done</div></div>';
+  h+='<div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="'+total+'" aria-valuenow="'+done+'"><i style="width:'+(total?Math.round(done/total*100):0)+'%"></i></div>';
+  var tn=testOn(sel);
+  if(tn)h+='<div class="banner">'+tn+' day. Add the exact subject and time as a task so it shows here.</div>';
+  if(type==='college'){
+    h+='<label class="f" style="margin-top:14px">What was taught today (type it, this is your revision list)<textarea id="topics" placeholder="e.g. Maths: partial differentiation · Physics: de Broglie waves">'+esc(state.topics[sel]||'')+'</textarea></label>';
+  }
+  h+='<ul class="sched">'+rows.map(function(r){return rowHtml(r,isT,nm)}).join('')+'</ul>';
+  var cls=TT[d.getDay()]||[];
+  if(cls.length){
+    h+='<details><summary>Classes this day</summary><div class="batch" role="group" aria-label="Your lab batch"><button class="ghost sm" data-act="batch" data-b="A" aria-pressed="'+(state.batch==='A')+'">Batches 1+2</button><button class="ghost sm" data-act="batch" data-b="B" aria-pressed="'+(state.batch==='B')+'">Batches 3+4</button></div><ul class="cls">'+
+      cls.map(function(x){var name=x.lab?x.lab[state.batch]:x.n;return '<li><b>'+x.t+'</b><span>'+esc(name)+(x.note?'<br><span class="muted" style="font-size:12px">'+esc(x.note)+'</span>':'')+'</span></li>'}).join('')+'</ul></details>';
+  }
+  if(baseType(d)!=='free'){
+    h+='<div style="margin-top:14px;display:flex;align-items:center;gap:10px">'+checkbox('data-chk="hol"',!!state.holidays[sel],'No college today')+'<span style="font-size:14px">No college today (holiday), use the full free-day plan</span></div>';
+  }
+  h+='<div style="margin-top:12px;display:flex;align-items:center;gap:10px">'+checkbox('data-chk="off"',!!state.off[sel],'I am out this day')+'<span style="font-size:14px">I am out this day: plan nothing and move my tasks</span></div>';
+  $('#day').innerHTML=h;
+}
+function statusOf(t){
+  if(isDone(t))return ['Done','ok'];
+  if(t.short>0)return [t.slots.length?'Does not fully fit':'No slot','bad'];
+  if(new Date(t.due)<new Date())return ['Overdue','bad'];
+  return ['Scheduled',''];
+}
+function rel(t){var ms=new Date(t.due)-new Date();if(ms<0)return 'overdue';var h=ms/36e5;if(h<24)return 'in '+Math.max(1,Math.round(h))+' h';var dd=Math.floor(h/24);return 'in '+dd+' day'+(dd>1?'s':'')}
+function renderDeadlines(){
+  var open=state.tasks.filter(function(t){return !isDone(t)}).sort(byDue);
+  var done=state.tasks.filter(isDone).sort(byDue).reverse().slice(0,4);
+  var h='<div class="dayhead" style="margin-bottom:4px"><h3 style="margin:0">Deadlines</h3><button class="ghost sm" data-act="replan">Re-plan all</button></div>';
+  if(!open.length)h+='<p class="muted" style="margin-top:10px">Nothing open. Add the next assignment above.</p>';
+  function item(t){
+    var st=statusOf(t),plans=t.slots.filter(function(s){return !s.done});
+    return '<li class="dl"><div class="dl-top"><span class="badge '+st[1]+'">'+st[0]+'</span><span class="badge">'+esc(KIND[t.kind]||'Task')+'</span></div>'+
+      '<div class="dl-title">'+esc(t.title)+'</div><div class="s">Due '+dueText(t)+' · '+(isDone(t)?'finished':rel(t))+' · '+dur(t.mins)+'</div>'+
+      (plans.length&&!isDone(t)?'<div class="dl-plan">'+plans.map(function(s){return '<button class="linkbtn" data-act="day" data-k="'+s.d+'">'+dlabel(s.d)+' · '+h12(s.s)+' to '+h12(s.e)+'</button>'}).join('')+'</div>':'')+
+      (t.short>0&&!isDone(t)?'<div class="s" style="color:var(--bad);margin-top:6px">'+dur(t.short)+' will not fit before the deadline. Free a slot or ask for more time.</div>':'')+
+      '<div class="dl-actions"><button class="ghost sm" data-act="taskdone" data-id="'+esc(t.id)+'">'+(isDone(t)?'Mark not done':'Mark done')+'</button>'+
+      (isDone(t)?'':'<button class="ghost sm" data-act="replan1" data-id="'+esc(t.id)+'">Re-plan</button>')+
+      '<button class="ghost sm danger" data-act="del" data-id="'+esc(t.id)+'">Delete</button></div></li>';
+  }
+  h+='<ul class="plain">'+open.map(item).join('')+'</ul>';
+  if(done.length)h+='<details><summary>Recently finished ('+done.length+')</summary><ul class="plain">'+done.map(item).join('')+'</ul></details>';
+  $('#deadlines').innerHTML=h;
+}
+function cInfo(){
+  var rem=CTOT-state.cMin,d=pd(today()),first=null,fin=null;
+  if(rem<=0)return {first:null,fin:null};
+  for(var i=0;i<120;i++){
+    var k=dk(d),b=template(d).blocks.filter(function(x){return x.key==='c'})[0];
+    if(b&&!state.doneBlocks[k+'|c']){if(!first)first={k:k,b:b};rem-=(b.e-b.s);if(rem<=0){fin=k;break}}
+    d.setDate(d.getDate()+1);
+  }
+  return {first:first,fin:fin};
+}
+function renderC(){
+  var pct=Math.min(100,Math.round(state.cMin/CTOT*100)),hrs=(Math.min(state.cMin,CTOT)/60).toFixed(1).replace('.0',''),info=cInfo();
+  var h='<h3>C programming · Code with Harry (11 h)</h3><div class="big">'+hrs+' h <span class="muted" style="font-size:16px;font-weight:500">of 11 h</span></div>'+
+    '<div class="bar code" style="margin-top:10px" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+pct+'"><i style="width:'+pct+'%"></i></div>';
+  if(state.cMin>=CTOT){
+    h+='<p style="margin-top:12px">Video finished. Your daily C blocks now switch to mastery practice. Work down the roadmap below.</p>';
+  }else{
+    h+='<p style="margin-top:12px">'+dur(CTOT-state.cMin)+' left. '+(info.first?'Next C block: <b>'+dlabel(info.first.k)+', '+h12(info.first.b.s)+'</b> ('+dur(info.first.b.e-info.first.b.s)+'). ':'')+
+      (info.fin?'At your planned blocks you finish on <b>'+dlabel(info.fin)+'</b>'+(info.fin>='2026-11-23'&&info.fin<='2026-11-25'?', which is Test 2 week':'')+'.':'')+'</p>';
+  }
+  h+='<div class="cbtns"><button class="ghost" data-act="cadd" data-m="30">+30 min</button><button class="ghost" data-act="cadd" data-m="60">+1 h</button>'+
+     '<input type="number" id="cset" min="0" max="11" step="0.25" placeholder="Set hours" aria-label="Set hours watched"><button class="ghost" data-act="cset">Set</button></div>'+
+     '<p class="s" style="margin-top:10px">Ticking a C block adds its time here. Use the buttons for extra time you watched outside a block, or Set to correct the total.</p>';
+  $('#cprog').innerHTML=h;
+}
+function renderDates(){
+  var k=today(),h='<h3>Key dates</h3>',n=0;
+  KD.forEach(function(x){
+    if(x[0]<k&&!(testOn(k)&&x[1].indexOf('Test')===0))return;
+    var dd=daysTo(x[0]);n++;
+    h+='<div class="kd"><span>'+esc(x[1])+'</span><span class="d">'+x[2]+' · '+(dd>0?'in '+dd+' d':'now')+'</span></div>';
+  });
+  $('#dates').innerHTML=h;
+}
+function renderRoad(){
+  var done=ROAD.filter(function(r){return state.road[r.k]}).length;
+  $('#road').innerHTML='<h3>After the video: master C beyond the syllabus</h3><p class="s">'+done+' of '+ROAD.length+' stages done. Starts once the 11 h video is finished.</p><ul class="road plain">'+
+    ROAD.map(function(r){return '<li>'+checkbox('data-chk="road" data-key="'+r.k+'"',!!state.road[r.k],'Stage done: '+r.t)+'<div><div class="t">'+esc(r.t)+'</div><div class="s">'+esc(r.d)+'</div></div></li>'}).join('')+'</ul>';
+}
+function renderSyl(){
+  var el=$('#syl'),pv=['#s-subj','#s-mod','#s-list'].map(function(q){var x=$(q);return x?x.value:''});
+  var h='<h3>Syllabus topics</h3><p class="s">Each study block shows the next unfinished topic for its subject. Ticking that block marks the topic done.</p>'+
+   '<div class="grid"><label class="f">Subject<select id="s-subj">'+SUBJ.map(function(s){return '<option>'+esc(s)+'</option>'}).join('')+'</select></label>'+
+   '<label class="f">Module<input type="text" id="s-mod" maxlength="20" placeholder="e.g. Module 2"></label>'+
+   '<label class="f full">Topics, one per line<textarea id="s-list" placeholder="Partial differentiation&#10;Taylor series"></textarea></label></div>'+
+   '<div style="margin-top:12px"><button class="btn" type="button" data-act="sylAdd">Add topics</button></div>';
+  SUBJ.forEach(function(s){
+    var l=state.syl.filter(function(x){return x.subj===s});if(!l.length)return;
+    var dn=l.filter(function(x){return x.done}).length;
+    h+='<details><summary>'+esc(s)+' · '+dn+' of '+l.length+' done</summary><ul class="road plain">'+l.map(function(x){
+      return '<li>'+checkbox('data-chk="syl" data-id="'+esc(x.id)+'"',x.done,'Topic done: '+x.title)+'<div><div class="t">'+esc(x.title)+'</div><div class="s">'+esc(x.mod||'')+' <button class="linkbtn" data-act="syldel" data-id="'+esc(x.id)+'">remove</button></div></div></li>'}).join('')+'</ul></details>';
+  });
+  el.innerHTML=h;
+  ['#s-subj','#s-mod','#s-list'].forEach(function(q,i){if(pv[i])$(q).value=pv[i]});
+}
+function renderAll(){renderHdr();renderStrip();renderDay();renderDeadlines();renderC();renderSyl();renderDates();renderRoad()}
+
+/* ---------- actions ---------- */
+function find(id){return state.tasks.filter(function(t){return t.id===id})[0]}
+function creditC(on){
+  var b=template(pd(sel)).blocks.filter(function(x){return x.key==='c'})[0];
+  if(!b)return;
+  if(on){var add=Math.max(0,Math.min(b.e-b.s,CTOT-state.cMin));state.cMin+=add;state.cLog[sel]=add}
+  else{state.cMin=Math.max(0,state.cMin-(state.cLog[sel]||0));delete state.cLog[sel]}
+}
+function slotText(s){return dlabel(s.d)+' '+h12(s.s)+' to '+h12(s.e)}
+function setPin(p){
+  pin=p;var el=$('#pinchip');
+  if(!p){el.hidden=true;el.innerHTML='';return}
+  el.hidden=false;el.innerHTML='<span>Starts in the free slot '+dlabel(p.d)+' '+h12(p.s)+' to '+h12(p.e)+'</span><button type="button" class="ghost sm" data-act="unpin">Clear</button>';
+}
+document.addEventListener('click',function(e){
+  var el=e.target.closest('[data-act]');if(!el)return;
+  var a=el.getAttribute('data-act'),id=el.getAttribute('data-id'),t;
+  if(a==='day'){sel=el.getAttribute('data-k');renderStrip();renderDay();var s=$('#strip');return}
+  if(a==='pin'){setPin({d:sel,s:+el.getAttribute('data-s'),e:+el.getAttribute('data-e')});$('#addcard').scrollIntoView({behavior:'smooth',block:'start'});setTimeout(function(){$('#f-title').focus()},350);return}
+  if(a==='unpin'){setPin(null);return}
+  if(a==='batch'){state.batch=el.getAttribute('data-b');touch();renderDay();var dd=document.querySelector('#day details');if(dd)dd.open=true;return}
+  if(a==='replan'){replanAll();touch();renderAll();return}
+  if(a==='replan1'){t=find(id);if(t){plan(t);touch();renderAll()}return}
+  if(a==='taskdone'){t=find(id);if(!t)return;
+    if(isDone(t)){t.forced=false;t.slots.forEach(function(s){s.done=false})}else{t.forced=true;t.slots.forEach(function(s){s.done=true})}
+    touch();renderAll();return}
+  if(a==='del'){
+    if(el.getAttribute('data-armed')!=='1'){el.setAttribute('data-armed','1');el.textContent='Tap again to delete';setTimeout(function(){if(el.isConnected){el.removeAttribute('data-armed');el.textContent='Delete'}},3000);return}
+    t=find(id);if(t&&t.auto)state.gone[t.id]=1;
+    state.tasks=state.tasks.filter(function(x){return x.id!==id});touch();renderAll();return}
+  if(a==='sylAdd'){
+    var ls=($('#s-list').value||'').split('\n').map(function(x){return x.trim()}).filter(Boolean);if(!ls.length)return;
+    var sj=$('#s-subj').value,md=$('#s-mod').value.trim();
+    ls.forEach(function(x,i){state.syl.push({id:'y'+Date.now().toString(36)+i+Math.random().toString(36).slice(2,4),subj:sj,mod:md,title:x.slice(0,120),done:false})});
+    $('#s-list').value='';touch();renderAll();return}
+  if(a==='syldel'){state.syl=state.syl.filter(function(x){return x.id!==id});touch();renderAll();return}
+  if(a==='nparse'){var tx=cleanNotice($('#n-text').value);if(!tx)return;applyNotice(parseNotice(tx),'');return}
+  if(a==='nai'){var tx2=cleanNotice($('#n-text').value);if(!tx2)return;noticeMsg('Reading with AI...',false);
+    askAI(tx2).then(function(o){applyNotice(o,'AI read it. ');addAiTopics(o)}).catch(function(err){noticeMsg(String(err.message||err)+' You can still use Read notice.',true)});return}
+  if(a==='keysave'){try{localStorage.setItem('bit-gemini-key',$('#n-key').value.trim())}catch(x){}noticeMsg('Key saved on this device.',false);return}
+  if(a==='export'){var bl=new Blob([JSON.stringify(state)],{type:'application/json'}),u=URL.createObjectURL(bl),an=document.createElement('a');an.href=u;an.download='bit-tracker-backup-'+today()+'.json';an.click();setTimeout(function(){URL.revokeObjectURL(u)},2000);return}
+  if(a==='import'){$('#n-file').click();return}
+  if(a==='fbsave'){var cfg=parseFb($('#fb-cfg').value);if(!cfg.apiKey||!cfg.projectId){fbStatus('The config needs at least apiKey and projectId.');return}
+    try{localStorage.setItem('bit-fb-config',JSON.stringify(cfg))}catch(x){}
+    fbStatus('Connecting...');fbStart(cfg).then(function(){fbStatus('Connected. Now sign in with Google.')}).catch(function(err){fbStatus(err.message)});return}
+  if(a==='fbin'){if(!fbAuth){fbStatus('Save and connect the config first.');return}fbAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(function(err){fbStatus('Sign-in failed: '+err.message)});return}
+  if(a==='fbout'){if(fbAuth)fbAuth.signOut();return}
+  if(a==='nact'){var nt=cleanNotice($('#n-text').value);if(!nt)return;runAssistant('This is a WhatsApp notice from my college. Make whatever changes it implies to my planner: add deadlines or tests, move or edit existing tasks, mark days as holiday, add syllabus topics. Notice:\n'+nt);$('#assist').scrollIntoView({behavior:'smooth',block:'start'});return}
+  if(a==='ask'){runAssistant();return}
+  if(a==='undo'){if(undoSnap){state=Object.assign(defaults(),JSON.parse(undoSnap));undoSnap=null;touch();renderAll();aMsg('Undone.',false)}return}
+  if(a==='cadd'){state.cMin=Math.min(CTOT,state.cMin+(+el.getAttribute('data-m')));touch();renderAll();return}
+  if(a==='cset'){var v=parseFloat($('#cset').value);if(isNaN(v))return;state.cMin=Math.max(0,Math.min(CTOT,Math.round(v*60)));touch();renderAll();return}
+});
+document.addEventListener('change',function(e){
+  var c=e.target.closest('[data-chk]');if(!c)return;
+  var ty=c.getAttribute('data-chk'),key;
+  if(ty==='blk'){key=sel+'|'+c.getAttribute('data-key');
+    if(c.checked){state.doneBlocks[key]=1;if(c.getAttribute('data-key')==='c')creditC(true)}
+    else{delete state.doneBlocks[key];if(c.getAttribute('data-key')==='c')creditC(false)}}
+  else if(ty==='slot'){var t=find(c.getAttribute('data-id'));if(!t)return;var sl=t.slots[+c.getAttribute('data-i')];if(!sl)return;sl.done=c.checked;if(!c.checked)t.forced=false}
+  else if(ty==='road'){state.road[c.getAttribute('data-key')]=c.checked}
+  else if(ty==='syl'){var tp2=state.syl.filter(function(x){return x.id===c.getAttribute('data-id')})[0];if(tp2){tp2.done=c.checked;if(!c.checked)delete tp2.doneOn}}
+  else if(ty==='hol'){if(c.checked)state.holidays[sel]=1;else delete state.holidays[sel];replanAll()}
+  else if(ty==='off'){if(c.checked)state.off[sel]=1;else delete state.off[sel];replanAll()}
+  if(ty==='blk'&&c.getAttribute('data-key')==='study'){var bb=template(pd(sel)).blocks.filter(function(x){return x.key==='study'})[0],tp=bb&&state.syl.filter(function(x){return x.id===bb.topicId})[0];if(tp){if(c.checked){tp.done=true;tp.doneOn=sel}else if(tp.doneOn===sel){tp.done=false;delete tp.doneOn}}}
+  touch();renderAll();
+});
+var topicTimer=null;
+document.addEventListener('input',function(e){
+  if(e.target.id!=='topics')return;
+  state.topics[sel]=e.target.value;persistLocal();
+  clearTimeout(topicTimer);topicTimer=setTimeout(touch,800);
+});
+$('#addform').addEventListener('submit',function(e){
+  e.preventDefault();
+  var title=$('#f-title').value.trim(),dateV=$('#f-date').value,timeV=$('#f-time').value||'08:00',msg=$('#addmsg');
+  if(!title||!dateV){msg.className='msg bad';msg.textContent='Add a name and a due date.';return}
+  if(new Date(dateV+'T'+timeV)<new Date()){msg.className='msg bad';msg.textContent='That due time has already passed. Pick a later date or time.';return}
+  var t={id:'t'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),title:title,kind:$('#f-kind').value,mins:+$('#f-mins').value,due:dateV+'T'+timeV,forced:false,slots:[],short:0};
+  state.tasks.push(t);plan(t,pin);setPin(null);touch();
+  var open=t.slots.map(slotText).join(' · ');
+  if(!t.slots.length){msg.className='msg bad';msg.textContent='No free slot before that deadline. Move the deadline or clear a slot, then tap Re-plan all.'}
+  else{msg.className='msg'+(t.short>0?' bad':'');msg.textContent='Placed: '+open+(t.short>0?'. '+dur(t.short)+' did not fit before the deadline.':'.')}
+  $('#f-title').value='';
+  renderAll();
+});
+function tick(){
+  if(document.hidden)return;
+  var n=rollover();
+  if(n>0){moveNote='Moved '+n+' missed task'+(n>1?'s':'')+' to the next free slot.';touch();renderAll();return}
+  var sc=$('#stopchip');if(sc)sc.textContent=stopText();
+  var ad=document.activeElement;
+  if(!(ad&&$('#day').contains(ad)))renderDay();
+}
+setInterval(tick,60000);
+document.addEventListener('visibilitychange',function(){if(!document.hidden)tick()});
+
+/* ---------- notices ---------- */
+function noticeMsg(t,bad){var m=$('#nmsg');m.className='msg'+(bad?' bad':'');m.textContent=t}
+function cleanNotice(t){return String(t||'').replace(/^\[?\d{1,2}[\/.]\d{1,2}[\/.]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:[ap]m)?\]?\s*-?\s*[^:\n]{1,40}:\s*/gim,'').trim()}
+function mkDate(d,mo,y){
+  var now=new Date(),yr=y?(+y<100?2000+ +y:+y):now.getFullYear(),dt=new Date(yr,mo,d);
+  if(dt.getDate()!==d||mo>11||mo<0)return '';
+  if(!y&&dt<pd(today()))dt=new Date(yr+1,mo,d);
+  return dk(dt)}
+function parseNotice(tx){
+  var lo=tx.toLowerCase(),date='',time='',m,MN={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+  if(m=lo.match(/\b(\d{1,2})(?:st|nd|rd|th)?[\s\-\/]*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?(?:[\s,\-\/]*(\d{4}))?/))date=mkDate(+m[1],MN[m[2]],m[3]);
+  else if(m=lo.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s*(\d{4}))?/))date=mkDate(+m[2],MN[m[1]],m[3]);
+  else if(m=lo.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/))date=mkDate(+m[1],+m[2]-1,m[3]);
+  if(!date){var n=new Date();if(/\btomorrow\b/.test(lo)){n.setDate(n.getDate()+1);date=dk(n)}else if(/\btoday\b/.test(lo))date=dk(n)}
+  if(m=lo.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/)){var h=+m[1]%12+(m[3]==='pm'?12:0);time=pad(h)+':'+(m[2]||'00')}
+  else if(m=lo.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/))time=pad(+m[1])+':'+m[2];
+  var kind='other';
+  if(/lab record|record/.test(lo))kind='lab';else if(/tutorial/.test(lo))kind='tut';else if(/test|cie|exam|quiz/.test(lo))kind='prep';else if(/assignment|submit|submission/.test(lo))kind='assign';
+  var title=tx.split('\n').map(function(x){return x.trim()}).filter(Boolean)[0]||'Notice';
+  return {title:title.slice(0,90),kind:kind,date:date,time:time,mins:0}}
+function applyNotice(o,pre){
+  if(!o)return;
+  if(o.title)$('#f-title').value=String(o.title).slice(0,90);
+  if(o.kind&&KIND[o.kind])$('#f-kind').value=o.kind;
+  if(/^\d{4}-\d{2}-\d{2}$/.test(o.date||''))$('#f-date').value=o.date;
+  if(/^\d{2}:\d{2}$/.test(o.time||''))$('#f-time').value=o.time;
+  if(+o.mins>0){var opts=[30,45,60,90,120,180,240],best=opts.reduce(function(a,b){return Math.abs(b-o.mins)<Math.abs(a-o.mins)?b:a});$('#f-mins').value=String(best)}
+  noticeMsg(pre+'Filled the form'+(o.date?'':' (no date found, set one)')+'. Check it, then tap "Fit into my free slots".',!o.date);
+  $('#addcard').scrollIntoView({behavior:'smooth',block:'start'})}
+function askAI(tx){
+  var key='';try{key=localStorage.getItem('bit-gemini-key')||''}catch(e){}
+  if(!key)return Promise.reject(new Error('Add your Gemini key under Settings and backup first.'));
+  var p='Today is '+today()+' (YYYY-MM-DD). Read this college notice and reply with JSON only: {"title":"short task name","kind":"assign|lab|tut|prep|code|other","date":"YYYY-MM-DD due or test date, or empty","time":"HH:MM 24h or empty","mins":estimated minutes of work as a number,"subject":"one of '+SUBJ.join(', ')+' or empty","topics":["syllabus topics mentioned"]}.\n\nNotice:\n'+tx;
+  return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key='+encodeURIComponent(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:p}]}],generationConfig:{responseMimeType:'application/json'}})})
+   .then(function(r){return r.json()}).then(function(j){if(j.error)throw new Error(j.error.message||'AI request failed.');return JSON.parse(j.candidates[0].content.parts[0].text)})}
+function addAiTopics(o){
+  if(!o||!o.topics||!o.topics.length||SUBJ.indexOf(o.subject)<0)return;
+  o.topics.forEach(function(x,i){x=String(x).trim();if(x&&!state.syl.some(function(y){return y.subj===o.subject&&y.title===x}))state.syl.push({id:'y'+Date.now().toString(36)+i,subj:o.subject,mod:'From notice',title:x.slice(0,120),done:false})});
+  touch();renderAll()}
+document.addEventListener('change',function(e){
+  if(e.target.id!=='n-file')return;
+  var f=e.target.files[0];if(!f)return;
+  var r=new FileReader();r.onload=function(){try{state=Object.assign(defaults(),JSON.parse(r.result));state.savedAt=Date.now();touch();renderAll();noticeMsg('Backup restored.',false)}catch(x){noticeMsg('That file is not a valid backup.',true)}};r.readAsText(f);e.target.value=''});
+
+/* ---------- sync ---------- */
+var fbDb=null,fbAuth=null,fbUnsub=null;
+function fbStatus(t){var e=$('#fb-status');if(e)e.textContent=t}
+function loadScript(u){return new Promise(function(res,rej){var s=document.createElement('script');s.src=u;s.onload=res;s.onerror=function(){rej(new Error('Could not load Firebase. Check your internet.'))};document.head.appendChild(s)})}
+function parseFb(t){var o={},m,re=/(\w+)\s*:\s*["']([^"']*)["']/g;t=String(t||'');
+  try{var j=JSON.parse(t);if(j&&typeof j==='object')return j}catch(e){}
+  while(m=re.exec(t))o[m[1]]=m[2];return o}
+function fbStart(cfg){
+  var B='https://www.gstatic.com/firebasejs/10.12.2/';
+  return (window.firebase?Promise.resolve():loadScript(B+'firebase-app-compat.js').then(function(){return loadScript(B+'firebase-auth-compat.js')}).then(function(){return loadScript(B+'firebase-firestore-compat.js')})).then(function(){
+    if(!firebase.apps.length)firebase.initializeApp(cfg);
+    fbAuth=firebase.auth();fbDb=firebase.firestore();
+    fbAuth.onAuthStateChanged(function(u){
+      if(fbUnsub){fbUnsub();fbUnsub=null}
+      if(!u){ref=null;loaded=true;syncText='Saved on this device';renderHdr();fbStatus('Not signed in.');return}
+      fbStatus('Signed in as '+(u.email||'your account')+'.');
+      var dref=fbDb.doc('users/'+u.uid+'/tracker/main');
+      ref=dref;loaded=false;
+      fbUnsub=dref.onSnapshot(function(snap){
+        if(snap.metadata.hasPendingWrites)return;
+        var remote=null;
+        if(snap.exists){try{remote=JSON.parse(snap.data().state)}catch(e){}}
+        if(remote&&(remote.savedAt||0)>(state.savedAt||0)){state=Object.assign(defaults(),remote);persistLocal();boot();renderAll()}
+        else if(!remote||(remote.savedAt||0)<(state.savedAt||0)){state.savedAt=state.savedAt||Date.now();dirty=true}
+        loaded=true;syncText='Synced to your account';renderHdr();flush();
+      },function(err){syncText='Sync error, kept on this device';renderHdr();fbStatus('Sync error: '+err.message)});
+    });
+  })}
+
+/* ---------- assistant ---------- */
+var undoSnap=null;
+function geminiJSON(p){
+  var key='';try{key=localStorage.getItem('bit-gemini-key')||''}catch(e){}
+  if(!key)return Promise.reject(new Error('Add your Gemini key under Settings and backup first.'));
+  return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key='+encodeURIComponent(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:p}]}],generationConfig:{responseMimeType:'application/json'}})})
+   .then(function(r){return r.json()}).then(function(j){if(j.error)throw new Error(j.error.message||'AI request failed.');return JSON.parse(j.candidates[0].content.parts[0].text)})}
+function aMsg(t,bad,undo){var m=$('#a-msg');m.className='msg'+(bad?' bad':'');m.textContent=t;
+  if(undo){var b=document.createElement('button');b.type='button';b.className='ghost sm';b.style.marginLeft='10px';b.setAttribute('data-act','undo');b.textContent='Undo';m.appendChild(b)}}
+function runAssistant(q0){
+  var q=q0||($('#a-q').value||'').trim();if(!q)return;
+  aMsg('Thinking...',false);
+  var tasks=state.tasks.filter(function(t){return !isDone(t)}).slice(0,60).map(function(t){return {id:t.id,title:t.title,kind:t.kind,mins:t.mins,due:t.due}});
+  var syl=state.syl.slice(0,150).map(function(x){return {id:x.id,subject:x.subj,module:x.mod,title:x.title,done:!!x.done}});
+  var p='You edit a student study planner. Today is '+today()+' ('+DOW[new Date().getDay()]+'). Subjects: '+SUBJ.join(', ')+'.\nOpen tasks: '+JSON.stringify(tasks)+'\nSyllabus topics: '+JSON.stringify(syl)+
+   '\nReply with JSON only: {"reply":"one or two short sentences","actions":[...]}. Allowed actions:\n{"do":"addTask","title":"","kind":"assign|lab|tut|prep|code|other","date":"YYYY-MM-DD","time":"HH:MM","mins":60}\n{"do":"editTask","id":"","title":"","date":"","time":"","mins":0} (include only fields to change)\n{"do":"deleteTask","id":""}\n{"do":"doneTask","id":"","done":true}\n{"do":"addTopics","subject":"","module":"","topics":[""]}\n{"do":"removeTopic","id":""}\n{"do":"doneTopic","id":"","done":true}\n{"do":"holiday","date":"YYYY-MM-DD","on":true}\n{"do":"out","date":"YYYY-MM-DD","on":true}\nUse only ids listed above. If the request needs something not allowed, return no actions and say so in reply.\n\nRequest: '+q;
+  geminiJSON(p).then(applyActions).catch(function(err){aMsg(String(err.message||err),true)})}
+function applyActions(o){
+  var acts=(o&&o.actions)||[],n=0,dre=/^\d{4}-\d{2}-\d{2}$/,tre=/^\d{2}:\d{2}$/;
+  undoSnap=JSON.stringify(state);
+  acts.forEach(function(a){try{var t;
+    if(a.do==='addTask'&&a.title&&dre.test(a.date||'')){state.tasks.push({id:'t'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),title:String(a.title).slice(0,90),kind:KIND[a.kind]?a.kind:'other',mins:Math.max(15,+a.mins||60),due:a.date+'T'+(tre.test(a.time||'')?a.time:'08:00'),forced:false,slots:[],short:0});n++}
+    else if(a.do==='editTask'&&(t=find(a.id))){if(a.title)t.title=String(a.title).slice(0,90);if(+a.mins>0)t.mins=+a.mins;var dd=dre.test(a.date||'')?a.date:t.due.slice(0,10),tt=tre.test(a.time||'')?a.time:t.due.slice(11,16);t.due=dd+'T'+tt;n++}
+    else if(a.do==='deleteTask'&&(t=find(a.id))){if(t.auto)state.gone[t.id]=1;state.tasks=state.tasks.filter(function(x){return x.id!==a.id});n++}
+    else if(a.do==='doneTask'&&(t=find(a.id))){t.forced=!!a.done;t.slots.forEach(function(s){s.done=!!a.done});n++}
+    else if(a.do==='addTopics'&&SUBJ.indexOf(a.subject)>=0&&a.topics){a.topics.forEach(function(x,i){x=String(x).trim();if(x){state.syl.push({id:'y'+Date.now().toString(36)+i+Math.random().toString(36).slice(2,4),subj:a.subject,mod:String(a.module||'').slice(0,20),title:x.slice(0,120),done:false});n++}})}
+    else if(a.do==='removeTopic'){var l0=state.syl.length;state.syl=state.syl.filter(function(x){return x.id!==a.id});if(state.syl.length<l0)n++}
+    else if(a.do==='doneTopic'){var tp=state.syl.filter(function(x){return x.id===a.id})[0];if(tp){tp.done=!!a.done;if(!a.done)delete tp.doneOn;n++}}
+    else if(a.do==='holiday'&&dre.test(a.date||'')){if(a.on)state.holidays[a.date]=1;else delete state.holidays[a.date];n++}
+    else if(a.do==='out'&&dre.test(a.date||'')){if(a.on)state.off[a.date]=1;else delete state.off[a.date];n++}
+  }catch(e){}});
+  if(n){replanAll();touch();renderAll()}else undoSnap=null;
+  aMsg((o&&o.reply?o.reply+' ':'')+(n?'('+n+' change'+(n>1?'s':'')+' made.)':'(No changes made.)'),false,!!n)}
+
+var tm0=new Date();tm0.setDate(tm0.getDate()+1);
+$('#f-date').value=dk(tm0);$('#f-date').min=today();
+init();
+try{var k0=localStorage.getItem('bit-gemini-key');if(k0)$('#n-key').value=k0}catch(e){}
+try{var fc=localStorage.getItem('bit-fb-config');if(fc){var cf=JSON.parse(fc);$('#fb-cfg').value=JSON.stringify(cf);fbStart(cf).catch(function(err){fbStatus(err.message)})}}catch(e){}
+var q=new URLSearchParams(location.search),sh=[q.get('title'),q.get('text'),q.get('url')].filter(Boolean).join('\n');
+if(sh){$('#n-text').value=sh;var ct=cleanNotice(sh);if(ct)applyNotice(parseNotice(ct),'Shared notice. ')}
+if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(function(){});
+})();
+</script>
+
+</body></html>
