@@ -162,7 +162,7 @@ summary{cursor:pointer;font-weight:600;font-size:14px}
 
   <section id="assist" class="card">
     <h3>Ask the assistant</h3>
-    <p class="muted" style="font-size:14px">Tell it what to change, for example "move my Maths assignment to Friday 6 PM", "I am out on Saturday" or "add these Physics topics". It edits tasks, topics, holidays and days out, and you can undo. Needs the Gemini key under Settings and backup.</p>
+    <p class="muted" style="font-size:14px">Tell it what to change, for example "move my Maths assignment to Friday 6 PM", "I am out on Saturday" or "add these Physics topics". It edits tasks, topics, holidays, days out and busy hours, and you can undo. Needs the Gemini key under Settings and backup.</p>
     <textarea id="a-q" placeholder="Ask or tell me a change" style="margin-top:12px"></textarea>
     <div class="cbtns"><button class="btn" type="button" data-act="ask">Do it</button></div>
     <div id="a-msg" role="status"></div>
@@ -175,6 +175,7 @@ summary{cursor:pointer;font-weight:600;font-size:14px}
     <div id="nmsg" role="status"></div>
     <details><summary>Settings and backup</summary>
       <label class="f" style="margin-top:10px">Gemini API key for "Read with AI" (free at aistudio.google.com, kept only on this device)<input type="text" id="n-key" autocomplete="off" placeholder="AIza..."></label>
+      <label class="f" style="margin-top:10px">Gemini model name (leave empty for the default, change it if Google retires it)<input type="text" id="n-model" autocomplete="off" placeholder="gemini-3.7-flash"></label>
       <div class="cbtns"><button class="ghost" type="button" data-act="keysave">Save key</button><button class="ghost" type="button" data-act="export">Export backup</button><button class="ghost" type="button" data-act="import">Import backup</button><input type="file" id="n-file" accept=".json" hidden></div>
       <h3 style="margin-top:16px">Sync between devices</h3>
       <label class="f">Firebase config (paste the block from your Firebase project)<textarea id="fb-cfg" placeholder="apiKey: ..., authDomain: ..., projectId: ..., appId: ..."></textarea></label>
@@ -247,7 +248,7 @@ function $(s){return document.querySelector(s)}
 
 function defaults(){return {v:1,savedAt:0,batch:'A',tasks:[],
   recurring:[{id:'phy-rec',title:'Physics lab record',kind:'lab',mins:90,dow:1,time:'08:00'},{id:'caed-tut',title:'CAED tutorial',kind:'tut',mins:120,dow:2,time:'08:00'}],
-  doneBlocks:{},syl:[],cLog:{},topics:{},holidays:{},off:{},gone:{},cMin:0,road:{},seeded:false}}
+  doneBlocks:{},syl:[],cLog:{},topics:{},holidays:{},off:{},busy:{},gone:{},cMin:0,road:{},seeded:false}}
 var state=defaults(), sel=today(), pin=null, moveNote='', syncText='Loading…';
 
 /* ---------- day types and templates ---------- */
@@ -316,6 +317,7 @@ function subtract(spans,s,e){var out=[];spans.forEach(function(x){if(e<=x.s||s>=
 function flexSpansFor(k){
   if(k<today())return [];
   var spans=template(pd(k)).flex.map(function(x){return {s:x.s,e:x.e}});
+  ((state.busy&&state.busy[k])||[]).forEach(function(b){spans=subtract(spans,b.s,b.e)});
   if(k===today()){var nm=Math.ceil((nowMin()+5)/15)*15;spans=spans.map(function(x){return {s:Math.max(x.s,nm),e:x.e}}).filter(function(x){return x.e>x.s})}
   state.tasks.forEach(function(t){t.slots.forEach(function(sl){if(sl.d===k)spans=subtract(spans,sl.s,sl.e)})});
   return spans.filter(function(x){return x.e-x.s>=15});
@@ -502,6 +504,7 @@ function renderDay(){
     h+='<div style="margin-top:14px;display:flex;align-items:center;gap:10px">'+checkbox('data-chk="hol"',!!state.holidays[sel],'No college today')+'<span style="font-size:14px">No college today (holiday), use the full free-day plan</span></div>';
   }
   h+='<div style="margin-top:12px;display:flex;align-items:center;gap:10px">'+checkbox('data-chk="off"',!!state.off[sel],'I am out this day')+'<span style="font-size:14px">I am out this day: plan nothing and move my tasks</span></div>';
+  h+=((state.busy&&state.busy[sel])||[]).map(function(b){return '<div class="s" style="margin-top:8px">Busy '+pad(Math.floor(b.s/60))+':'+pad(b.s%60)+' to '+pad(Math.floor(b.e/60))+':'+pad(b.e%60)+', nothing planned then</div>'}).join('');
   $('#day').innerHTML=h;
 }
 function statusOf(t){
@@ -626,7 +629,7 @@ document.addEventListener('click',function(e){
   if(a==='nparse'){var tx=cleanNotice($('#n-text').value);if(!tx)return;applyNotice(parseNotice(tx),'');return}
   if(a==='nai'){var tx2=cleanNotice($('#n-text').value);if(!tx2)return;noticeMsg('Reading with AI...',false);
     askAI(tx2).then(function(o){applyNotice(o,'AI read it. ');addAiTopics(o)}).catch(function(err){noticeMsg(String(err.message||err)+' You can still use Read notice.',true)});return}
-  if(a==='keysave'){try{localStorage.setItem('bit-gemini-key',$('#n-key').value.trim())}catch(x){}noticeMsg('Key saved on this device.',false);return}
+  if(a==='keysave'){try{localStorage.setItem('bit-gemini-key',$('#n-key').value.trim());var gm=$('#n-model').value.trim();if(gm)localStorage.setItem('bit-gemini-model',gm);else localStorage.removeItem('bit-gemini-model')}catch(x){}noticeMsg('Key saved on this device.',false);return}
   if(a==='export'){var bl=new Blob([JSON.stringify(state)],{type:'application/json'}),u=URL.createObjectURL(bl),an=document.createElement('a');an.href=u;an.download='bit-tracker-backup-'+today()+'.json';an.click();setTimeout(function(){URL.revokeObjectURL(u)},2000);return}
   if(a==='import'){$('#n-file').click();return}
   if(a==='fbsave'){var cfg=parseFb($('#fb-cfg').value);if(!cfg.apiKey||!cfg.projectId){fbStatus('The config needs at least apiKey and projectId.');return}
@@ -720,7 +723,7 @@ function askAI(tx){
   var key='';try{key=localStorage.getItem('bit-gemini-key')||''}catch(e){}
   if(!key)return Promise.reject(new Error('Add your Gemini key under Settings and backup first.'));
   var p='Today is '+today()+' (YYYY-MM-DD). Read this college notice and reply with JSON only: {"title":"short task name","kind":"assign|lab|tut|prep|code|other","date":"YYYY-MM-DD due or test date, or empty","time":"HH:MM 24h or empty","mins":estimated minutes of work as a number,"subject":"one of '+SUBJ.join(', ')+' or empty","topics":["syllabus topics mentioned"]}.\n\nNotice:\n'+tx;
-  return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key='+encodeURIComponent(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:p}]}],generationConfig:{responseMimeType:'application/json'}})})
+  return fetch('https://generativelanguage.googleapis.com/v1beta/models/'+gModel()+':generateContent?key='+encodeURIComponent(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:p}]}],generationConfig:{responseMimeType:'application/json'}})})
    .then(function(r){return r.json()}).then(function(j){if(j.error)throw new Error(j.error.message||'AI request failed.');return JSON.parse(j.candidates[0].content.parts[0].text)})}
 function addAiTopics(o){
   if(!o||!o.topics||!o.topics.length||SUBJ.indexOf(o.subject)<0)return;
@@ -741,8 +744,8 @@ function parseFb(t){var o={},m,re=/(\w+)\s*:\s*["']([^"']*)["']/g;t=String(t||''
 function fbStart(cfg){
   var B='https://www.gstatic.com/firebasejs/10.12.2/';
   return (window.firebase?Promise.resolve():loadScript(B+'firebase-app-compat.js').then(function(){return loadScript(B+'firebase-auth-compat.js')}).then(function(){return loadScript(B+'firebase-firestore-compat.js')})).then(function(){
-    if(!firebase.apps.length)firebase.initializeApp(cfg);
-    fbAuth=firebase.auth();fbDb=firebase.firestore();
+    firebase.apps.slice().forEach(function(a){a.delete()});var fa=firebase.initializeApp(cfg,'a'+Date.now());
+    fbAuth=fa.auth();fbDb=fa.firestore();
     fbAuth.onAuthStateChanged(function(u){
       if(fbUnsub){fbUnsub();fbUnsub=null}
       if(!u){ref=null;loaded=true;syncText='Saved on this device';renderHdr();fbStatus('Not signed in.');return}
@@ -761,11 +764,12 @@ function fbStart(cfg){
   })}
 
 /* ---------- assistant ---------- */
+function gModel(){var m='';try{m=localStorage.getItem('bit-gemini-model')||''}catch(e){}return m||'gemini-3.7-flash'}
 var undoSnap=null;
 function geminiJSON(p){
   var key='';try{key=localStorage.getItem('bit-gemini-key')||''}catch(e){}
   if(!key)return Promise.reject(new Error('Add your Gemini key under Settings and backup first.'));
-  return fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key='+encodeURIComponent(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:p}]}],generationConfig:{responseMimeType:'application/json'}})})
+  return fetch('https://generativelanguage.googleapis.com/v1beta/models/'+gModel()+':generateContent?key='+encodeURIComponent(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:p}]}],generationConfig:{responseMimeType:'application/json'}})})
    .then(function(r){return r.json()}).then(function(j){if(j.error)throw new Error(j.error.message||'AI request failed.');return JSON.parse(j.candidates[0].content.parts[0].text)})}
 function aMsg(t,bad,undo){var m=$('#a-msg');m.className='msg'+(bad?' bad':'');m.textContent=t;
   if(undo){var b=document.createElement('button');b.type='button';b.className='ghost sm';b.style.marginLeft='10px';b.setAttribute('data-act','undo');b.textContent='Undo';m.appendChild(b)}}
@@ -775,7 +779,7 @@ function runAssistant(q0){
   var tasks=state.tasks.filter(function(t){return !isDone(t)}).slice(0,60).map(function(t){return {id:t.id,title:t.title,kind:t.kind,mins:t.mins,due:t.due}});
   var syl=state.syl.slice(0,150).map(function(x){return {id:x.id,subject:x.subj,module:x.mod,title:x.title,done:!!x.done}});
   var p='You edit a student study planner. Today is '+today()+' ('+DOW[new Date().getDay()]+'). Subjects: '+SUBJ.join(', ')+'.\nOpen tasks: '+JSON.stringify(tasks)+'\nSyllabus topics: '+JSON.stringify(syl)+
-   '\nReply with JSON only: {"reply":"one or two short sentences","actions":[...]}. Allowed actions:\n{"do":"addTask","title":"","kind":"assign|lab|tut|prep|code|other","date":"YYYY-MM-DD","time":"HH:MM","mins":60}\n{"do":"editTask","id":"","title":"","date":"","time":"","mins":0} (include only fields to change)\n{"do":"deleteTask","id":""}\n{"do":"doneTask","id":"","done":true}\n{"do":"addTopics","subject":"","module":"","topics":[""]}\n{"do":"removeTopic","id":""}\n{"do":"doneTopic","id":"","done":true}\n{"do":"holiday","date":"YYYY-MM-DD","on":true}\n{"do":"out","date":"YYYY-MM-DD","on":true}\nUse only ids listed above. If the request needs something not allowed, return no actions and say so in reply.\n\nRequest: '+q;
+   '\nReply with JSON only: {"reply":"one or two short sentences","actions":[...]}. Allowed actions:\n{"do":"addTask","title":"","kind":"assign|lab|tut|prep|code|other","date":"YYYY-MM-DD","time":"HH:MM","mins":60}\n{"do":"editTask","id":"","title":"","date":"","time":"","mins":0} (include only fields to change)\n{"do":"deleteTask","id":""}\n{"do":"doneTask","id":"","done":true}\n{"do":"addTopics","subject":"","module":"","topics":[""]}\n{"do":"removeTopic","id":""}\n{"do":"doneTopic","id":"","done":true}\n{"do":"holiday","date":"YYYY-MM-DD","on":true}\n{"do":"out","date":"YYYY-MM-DD","on":true}\n{"do":"busy","dates":["YYYY-MM-DD"],"from":"13:00","to":"16:00","on":true} (not free during those hours on those dates; on:false clears busy hours for those dates)\nUse only ids listed above. If the request needs something not allowed, return no actions and say so in reply.\n\nRequest: '+q;
   geminiJSON(p).then(applyActions).catch(function(err){aMsg(String(err.message||err),true)})}
 function applyActions(o){
   var acts=(o&&o.actions)||[],n=0,dre=/^\d{4}-\d{2}-\d{2}$/,tre=/^\d{2}:\d{2}$/;
@@ -789,6 +793,7 @@ function applyActions(o){
     else if(a.do==='removeTopic'){var l0=state.syl.length;state.syl=state.syl.filter(function(x){return x.id!==a.id});if(state.syl.length<l0)n++}
     else if(a.do==='doneTopic'){var tp=state.syl.filter(function(x){return x.id===a.id})[0];if(tp){tp.done=!!a.done;if(!a.done)delete tp.doneOn;n++}}
     else if(a.do==='holiday'&&dre.test(a.date||'')){if(a.on)state.holidays[a.date]=1;else delete state.holidays[a.date];n++}
+    else if(a.do==='busy'&&a.dates&&(a.on===false||(tre.test(a.from||'')&&tre.test(a.to||'')))){state.busy=state.busy||{};a.dates.forEach(function(dt){if(!dre.test(dt))return;if(a.on===false)delete state.busy[dt];else(state.busy[dt]=state.busy[dt]||[]).push({s:tm(a.from),e:tm(a.to)});n++})}
     else if(a.do==='out'&&dre.test(a.date||'')){if(a.on)state.off[a.date]=1;else delete state.off[a.date];n++}
   }catch(e){}});
   if(n){replanAll();touch();renderAll()}else undoSnap=null;
@@ -798,6 +803,7 @@ var tm0=new Date();tm0.setDate(tm0.getDate()+1);
 $('#f-date').value=dk(tm0);$('#f-date').min=today();
 init();
 try{var k0=localStorage.getItem('bit-gemini-key');if(k0)$('#n-key').value=k0}catch(e){}
+try{$('#n-model').value=localStorage.getItem('bit-gemini-model')||''}catch(e){}
 try{var fc=localStorage.getItem('bit-fb-config');if(fc){var cf=JSON.parse(fc);$('#fb-cfg').value=JSON.stringify(cf);fbStart(cf).catch(function(err){fbStatus(err.message)})}}catch(e){}
 var q=new URLSearchParams(location.search),sh=[q.get('title'),q.get('text'),q.get('url')].filter(Boolean).join('\n');
 if(sh){$('#n-text').value=sh;var ct=cleanNotice(sh);if(ct)applyNotice(parseNotice(ct),'Shared notice. ')}
